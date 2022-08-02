@@ -30,7 +30,8 @@ def guess_lat_lon_vert_names(dataArray):
     :param dataArray:
     :return: latitude, longitude & vertical co-ord names
     """
-
+    if dataArray is None:
+        return None, None, None
     def find_name(dimensions, patterns):
         name = None
         for pattern in patterns:
@@ -143,20 +144,34 @@ def genProcess(dataset, land_mask, latitude_coord=None):
     #                         dataset.UM_atmosphere_hybrid_sigma_pressure_coordinate_ak_bounds,
     #                         dataset.UM_atmosphere_hybrid_sigma_pressure_coordinate_bk_bounds)
     delta_p = None # not bothering to set up delta P as not actually used.
+
+    def extract_ds(dataset,name,coord=None,mask=None):
+
+        var = lookup_std.get(name,lookup_long.get(name)) # try standard name first. If not found use long name
+        if var is None:
+            print(f"Failed to find {name} in standard or long list ")
+            return None # no name found so return empty
+
+        da = dataset[var]
+
+        if mask is not None:
+            da=da.where(mask,np.nan)
+        if coord is not None:
+            da=da.sel(coord,method='nearest')
+        return da
+
     process = {
-        'TEMP@50': dataset[lookup_long['TEMPERATURE ON P LEV/T GRID']].sel(coord_50hPa, method='nearest'),
-        'TEMP@500': dataset[lookup_long['TEMPERATURE ON P LEV/T GRID']].sel(coord_500hPa, method='nearest'),
-        'RH@500': dataset[lookup_long['RELATIVE HUMIDITY ON P LEV/T GRID']].sel(coord_500hPa, method='nearest'),
-        'OLR': dataset[lookup_std['toa_outgoing_longwave_flux']],
-        'OLRC': dataset[lookup_std['toa_outgoing_longwave_flux_assuming_clear_sky']],
-        'RSR': dataset[lookup_std['toa_outgoing_shortwave_flux']],
-        'RSRC': dataset[lookup_std['toa_outgoing_shortwave_flux_assuming_clear_sky']],
-        'INSW': dataset[lookup_std['toa_incoming_shortwave_flux']],
-        'LAT': xarray.where(land_mask, dataset[lookup_long['TEMPERATURE AT 1.5M']], np.nan).sel(
-            {latitude_coord: constrain_60S}),
-        'Lprecip': xarray.where(land_mask, dataset[lookup_std['precipitation_flux']], np.nan).sel(
-            {latitude_coord: constrain_60S}),
-        'MSLP': dataset[lookup_std['air_pressure_at_sea_level']],
+        #'TEMP@50': dataset[lookup_long['TEMPERATURE ON P LEV/T GRID']].sel(coord_50hPa, method='nearest'),
+        'TEMP@500': extract_ds(dataset,'TEMPERATURE ON P LEV/T GRID',coord=coord_500hPa),
+        'RH@500': extract_ds(dataset,'RELATIVE HUMIDITY ON P LEV/T GRID',coord=coord_500hPa),
+        'OLR': extract_ds(dataset,'toa_outgoing_longwave_flux'),
+        'OLRC': extract_ds(dataset,'toa_outgoing_longwave_flux_assuming_clear_sky'),
+        'RSR': extract_ds(dataset,'toa_outgoing_shortwave_flux'),
+        'RSRC': extract_ds(dataset,'toa_outgoing_shortwave_flux_assuming_clear_sky'),
+        'INSW': extract_ds(dataset,'toa_incoming_shortwave_flux'),
+        'LAT': extract_ds(dataset,'TEMPERATURE AT 1.5M',coord={latitude_coord: constrain_60S},mask=land_mask),
+        'Lprecip': extract_ds(dataset, 'precipitation_flux', coord={latitude_coord: constrain_60S}, mask=land_mask),
+        'MSLP': extract_ds(dataset, 'air_pressure_at_sea_level'),
         #'REFF': dataset['UM_m01s01i245'] / dataset['UM_m01s01i246'],
         # HadXM3 carries all S compounds as mass of S. So SO2 & DMS need conversion to SO2 & DMS for
         # comparison with obs. Code below will need updating for HadGEM-GA10?
@@ -181,7 +196,7 @@ def means(dataArray, name, latitude_coord=None):
     Compute means for NH extra tropics, Tropics and SH extra Tropics. 
     Tropics is 30N to 30S. NH extra tropics 30N to 90N and SH extra tropics 90S to 30S 
     Arguments:
-        :param dataArray -- dataArray to be processed
+        :param dataArray -- dataArray to be processed. If None a bunch of Nones will be returned
         :param name -- name to call mean.
         :param latitude_coord: name of the latitude co-ord. Default is NOne.
             If not set then guess_lat_long_vert_names() will be used
@@ -192,7 +207,8 @@ def means(dataArray, name, latitude_coord=None):
     if latitude_coord is None:
         latitude_coord, lon, vert = guess_lat_lon_vert_names(dataArray)
 
-    wt = np.cos(np.deg2rad(dataArray[latitude_coord]))  # simple cos lat weighting.
+    if dataArray is not None:
+        wt = np.cos(np.deg2rad(dataArray[latitude_coord]))  # simple cos lat weighting.
     # constraints and names for regions.
     constraints = {
         'GLOBAL': None,
@@ -202,13 +218,16 @@ def means(dataArray, name, latitude_coord=None):
     }
     means = dict()
     for rgn_name, rgn_fn in constraints.items():
-        if rgn_fn is None:
-            v = dataArray.squeeze().weighted(wt).mean()
+        if dataArray is None:
+            means[name + '_' + rgn_name] = None
         else:
-            msk = rgn_fn(dataArray[latitude_coord])  # T where want data
-            v = dataArray.where(msk, np.nan).squeeze().weighted(wt.where(msk, 0.0)).mean()
-        means[name + '_' + rgn_name] = float(v.load().squeeze().values)
-        # store the actual values -- losing all meta-data
+            if rgn_fn is None:
+                v = dataArray.squeeze().weighted(wt).mean()
+            else:
+                msk = rgn_fn(dataArray[latitude_coord])  # T where want data
+                v = dataArray.where(msk, np.nan).squeeze().weighted(wt.where(msk, 0.0)).mean()
+            means[name + '_' + rgn_name] = float(v.load().squeeze().values)
+            # store the actual values -- losing all meta-data
 
     return means  # means are what we want
 
@@ -255,7 +274,7 @@ def do_work():
     if args.dir is None:
         rootdir = pathlib.Path.cwd()
     else:
-        rootdir = pathlib.Path(args.dir)
+        rootdir = pathlib.Path(os.path.expandvars(args.dir))
     files = list(rootdir.glob('*.nc'))
       
     mask_file = options['mask_file']
@@ -314,6 +333,7 @@ def do_work():
             print(f"Processed {name} and got {mean}")
 
     # now fix the MSLP values. Need to remove the global mean from values and the drop the SHX value.
+    # TODO put this in mean calculation as an option..
     summary.pop('MSLP_SHX')
     for k in ['MSLP_NHX', 'MSLP_TROPICS']:
         summary[k + '_DGM'] = summary.pop(k) - summary['MSLP_GLOBAL']
@@ -324,7 +344,10 @@ def do_work():
         results[k.lower()]=v
     if verbose:  # print out the summary data for all created values
         for name, value in results.items():
-            print(f"{name.lower()}: {value:.4g}")
+            if value is None:
+                print(f"{name.lower()}: {value}")
+            else:
+                print(f"{name.lower()}: {value:.4g}")
         print("============================================================")
 
     # now to write the data
