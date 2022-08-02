@@ -7,9 +7,9 @@
     "Name_comment": "Study Name",
     "baseRunID": "aa",
     "baseRunID_comment": "base for runID. Only first two characters are generally used.",
-    "runTime": 10000,
-    "runTime_comment": "Time in seconds for run. Run for 6 years should take about 9200 seconds ~ 3 hours.",
-    "runCode": "nc2-optclim",
+    "runTime": null,
+    "runTime_comment": "Time in seconds for run. ",
+    "runCode": null,
     "runCode_comment": "Project code to run job under.",
     "machineName": "archer2",
     "machineName_comment": "Name of machine to submit runs to",
@@ -25,12 +25,12 @@
         "comment_comment": "Would be nice if this information could be built by querying the reference model",
         "defaultParams": {
             "comment": "Default parameter values for HadGEM-GA10. null values or not set mean don't modify.  ",
-            "DEC_THRES_CU":0.05,
-            "DEC_THRES_CU_comment": "Buoyancy flux threshold for cumulus sub-cloud layers",
+            "DP_CORR_STRAT":10000.000,
+            "DP_CORR_STRAT_comment": "Decorrelation scale pressure.",
             "TWO_D_FSD_FACTOR":1.5,
             "TWO_D_FSD_FACTOR_comment":"Scaling to make sub-grid cloud condensate variance to cloud cover and convective activity two dimensional.",
-            "CI_INPUT": 1.43e1,
-            "CI_INPUT_comment": "Ice fall speed scaling for large ice",
+            "ENT_FAC_DP": 1.13,
+            "ENT_FAC_DP_comment": "Deep entrainment amplitude",
             "AI": 2.57e-2,
             "AI_comment": "Linear scaling on pwer-law behaviour for ice mass -- ice density",
             "START_TIME": null,
@@ -40,9 +40,9 @@
         },
         "initParams": {
             "comment": "Intial values for parameters to be optimised. Set to null to use default values.  ",
-            "DEC_THRES_CU":null,
+            "DP_CORR_STRAT":null,
             "TWO_D_FSD_FACTOR":null,
-            "CI_INPUT": null,
+            "ENT_FAC_DP": null,
             "AI": null
         },
         "initScale": false,
@@ -55,14 +55,14 @@
         "fixedScale": false,
         "fixedScale_comment": "If true then scalable fixedParams range from 0 to 1 where 0 means min value; 1 max value.",
         "minmax": {
-            "comment": "Defines the minimum and maximum ranges for the parameters. Must be defined for ALL parameters used. Comes from by-eye digitisation of Sexton et al, 2021",
-            "DEC_THRES_CU":[0.0,0.5],
-            "TWO_D_FSD_FACTOR":[1,2],
-            "CI_INPUT": [5,30],
-            "AI": [5e-3,5e-2]
+            "comment": "Defines the minimum and maximum ranges for the parameters. Must be defined for ALL parameters used. From Sexton et al, 2021. See https://github.com/qump-project/qump-hadgem3",
+            "DP_CORR_STRAT":[2500.0,40000],
+            "TWO_D_FSD_FACTOR":[1.0,2,0],
+            "ENT_FAC_DP": [0,4.0],
+            "AI": [6.1e-3,5.55e-2]
             },
         "steps": {
-            "comment": "Steps for perturbations -- norm around 10% of the range. If not specified 10% will be used. TO UPDATE. Values below are from 7 parameter cases described in Tett et al, 2017 (GMDD. They are not particualry optimal",
+            "comment": "Steps for perturbations -- norm around 10% of the range. If not specified 10% will be used. None specified as DFOLS does not use",
             "STEPS": "Put step values here if wanted"
         }
     },
@@ -71,7 +71,7 @@
         "referenceModelDirectory": "$OPTCLIMTOP/Configurations/xhdiu_ia_tune",
         "referenceModelDirectory_comment": "Directory where reference model configuration exists. Default is START_DIR/start. ",
         "covariance": {
-            "comment": "Covariance matrices and operations on them. If CovObsErr and CovIntVar are *both* specified then CovTotal will be computed from them",
+            "comment": "Covariance matrices and operations on them. If CovObsErr and CovIntVar are *both* specified then CovTotal will be computed from them. TODO MOVE coviariance info somewhere else..",
             "CovTotal": null,
             "CovTotal_Comment": "Name of file containing Covariance Matrix for total Error.",
             "CovTotalDiagonalise": false,
@@ -195,7 +195,7 @@
         "end_time_comment": "End time as str of ISO std string"
     },
     "targets": {
-        "comment": "Observed targets for optimisation. Should include constraint value. TO UPDATE",
+        "comment": "Observed targets for optimisation. Should include constraint value. ",
         "rsr_nhx": 102.276779013,
         "rsr_tropics": 94.172585284,
         "rsr_shx": 108.113226173,
@@ -222,7 +222,7 @@
         "netflux_global_comment": "Often used as a constraint.."
     },
     "scalings": {
-        "comment": "Scalings on observables -- only defined when not 1.0. TO UPDATE",
+        "comment": "Scalings on observables -- only defined when not 1.0. ",
         "lprecip_nhx": 86400.0,
         "lprecip_tropics": 86400.0,
         "lprecip_shx": 86400.0,
@@ -232,7 +232,7 @@
     },
     "standardModel": {
         "SimulatedValues": {
-            "comment": "Values from Initial Cond ensemble -- used for display. TO UPDATE",
+            "comment": "Values from Initial Cond hadAM3 ensemble -- used for display. ",
             "rsr_nhx": 104.828645378,
             "rsr_tropics": 96.1125810912,
             "rsr_shx": 106.220769668,
