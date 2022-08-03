@@ -240,9 +240,9 @@ def do_work():
     # parse input arguments
 
     parser = argparse.ArgumentParser(description="""
-    Post process Unified Model data to provide 32 simulated observations. Example use is:
+    Post process Unified Model data to provide  simulated observations. Example use is:
     
-    comp_sim_obs.py input.json /exports/work/geos_cesd_workspace/OptClim/Runs/st17_reg/01/s0101/A/output.json nc/apm/*.nc
+    comp_sim_obs.py input.json --output output.json --dir /work/n02/n02/tetts/cylc-run/u-cp254/share/data/History_Data/
     
     Observations are:
     Global mean, Northern Hemisphere Extra-tropical average (30N-90N), Southern Hemisphere Extra-tropical (90S-30S) mean and 
@@ -255,11 +255,7 @@ def do_work():
       Clear sky reflected shortwave
       Land air temperature at 1.5m (north of 60S)
       Land precipitation at 1.5m  (north of 60S)
-      Effective cloud radius
-      total column SO2 
-      total column DMS
       Netflux 
-    
       Northern Hemisphere Extra-tropical and Tropical Mean Sea Level Pressure difference from global average
     """
                                      )
@@ -278,7 +274,7 @@ def do_work():
         rootdir = pathlib.Path.cwd()
     else:
         rootdir = pathlib.Path(os.path.expandvars(args.dir))
-    files = list(rootdir.glob('*.nc'))
+    files = list(rootdir.glob('*_pm*.nc')) # only want monthly mean netcdf files.
 
     mask_file = options['mask_file']
     mask_file = pathlib.Path(os.path.expandvars(mask_file)).expanduser()
