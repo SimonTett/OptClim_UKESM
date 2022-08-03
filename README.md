@@ -22,3 +22,9 @@ comp_obs_values.py configs/UKESM_test_opt.json output_obs2012.json  ../HadCM3-CM
 3) Include the tgt in the main config file. 
 And remember to commit/push to git.
 
+Directories:
+configs -- all things configuration related
+covariance -- where covariances live
+post_process -- all things post processing related
+test_data -- where test data lives. 
+rose_configs -- rose configurations
