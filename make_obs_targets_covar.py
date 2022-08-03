@@ -133,9 +133,11 @@ for key in keys:
     key_want = key.replace('extra_', '')
     delta[key_want] = np.abs(target[key_want] - target.pop(key))
 
+# lower case all names
+target_out = {k.lower():v for k,v in target.items()}
 
 with open(args.TARGET, 'w') as fp:
-    json.dump(target, fp, indent=2)
+    json.dump(target_out, fp, indent=2)
 
 
 def set_corr_block(corr, var=None):
@@ -167,5 +169,7 @@ cov = pd.DataFrame(np.outer(ser, ser), index=ser.index, columns=ser.index)
 corr = pd.DataFrame(np.identity(len(ser)), index=ser.index, columns=ser.index)
 corr = set_corr_block(corr)
 cov *= corr
-
+# lowercase index & columns
+rename={k:k.lower() for k in cov.index}
+cov = cov.rename(index=rename,columns=rename)
 cov.to_csv(args.OBSERRCOV)
