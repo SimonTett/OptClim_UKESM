@@ -80,7 +80,9 @@ for file, rewrite in rewrite_rules.items():  # iterate over the files
     wanted = np.array(list(rewrite.keys()))  # what we are rewritting
     newName = np.array(list(rewrite.values()))  # new name
     for k, v in data.items():  # iterate over the rewrite rules for this file
-        name, suffix = k.rsplit("_", 1)  # split it up (last bit is GLOBAL, NHX etc
+        name, suffix = k.rsplit("_", maxsplit=1)  # split it up (last bit is GLOBAL, NHX etc)
+        if suffix.endswith('DGM'): # fix the DGM
+            suffix = suffix[0:-3]+"_"+suffix[-3:]
         L = (name == wanted)  # True if match/F if not
         if L.sum() > 0:  # got it.
             outkey = newName[L][0] + "_" + suffix  # new name
