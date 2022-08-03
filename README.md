@@ -6,8 +6,14 @@ You need:
 2) UKESM_test_opt.json -- config file
 3) Set up the environment var OPT_UKESM to point to the root dir for the UKESM stuff!
 
-To produce the observed dataset proceed as follows -- on burn where
-data lives. 
+To test put your self in OPT_UKESM and do:
+
+./post_process/comp_sim_obs_UKESM_atmos.py configs/UKESM_test_opt.json -d test_data/test_UKESM_nc/History_Data/
+
+You can check the values in observations.json against the *standard* values in configs/UKESM_test_opt.json .
+
+To produce the observed dataset proceed as follows -- on burn or stream  where
+the observed data lives. 
 
  This dataset is actually the N48 values done for HadAM3 CMIP6
 work. But for same period as post-processing will run for. Given we
@@ -23,8 +29,13 @@ comp_obs_values.py configs/UKESM_test_opt.json output_obs2012.json  ../HadCM3-CM
 And remember to commit/push to git.
 
 Directories:
+
 configs -- all things configuration related
+
 covariance -- where covariances live
+
 post_process -- all things post processing related
+
 test_data -- where test data lives. 
+
 rose_configs -- rose configurations
