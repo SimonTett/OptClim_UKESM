@@ -261,7 +261,7 @@ def do_work():
                                      )
     parser.add_argument("CONFIG", help="The Name of the Config file")
     parser.add_argument("-d", "--dir", help="The Name of the input directory")
-    parser.add_argument("-o", "--output", help="The name of the output file. Will override what is in the config file")
+    parser.add_argument("output", help="The name of the output file. Will override what is in the config file")
     parser.add_argument("-v", "--verbose", help="Provide verbose output", action="count", default=0)
     args = parser.parse_args()  # and parse the arguments
     # setup processing
