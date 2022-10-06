@@ -39,3 +39,9 @@ post_process -- all things post processing related
 test_data -- where test data lives. 
 
 rose_configs -- rose configurations
+
+baseSuite - the suites used for the example study.
+-- Lbase254: base suite for the model (after adding the pre and post model tasks) - this is cloned for each run.
+-- Lctl-254: the controlling suite that causes the clones to be created.
+
+results  -- the final json (...final.json) and the plot summarising the results
