@@ -428,7 +428,7 @@ def compute_values(files:typing.Iterable[pathlib.Path],
             continue
         mean = means(dataArray, name)  # compute the means
         results.update(mean)  # and stuff them into the results dict.
-        logging.info(f"Processed {name} and got {mean}")
+        logging.debug(f"Processed {name} and got {mean}")
 
 
     # now fix the MSLP values. Need to remove the global mean from values and the drop the SHX value.
