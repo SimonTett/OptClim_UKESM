@@ -1,17 +1,17 @@
 {
-    "history": "Optimisation configuration for UKESM trial. Perturbing 4 model parameters based on HadAM3 CMIP6 config. Do define OPT_UKESM in your env.  ",
+    "history": "Optimisation configuration for UKESM trial. Perturbing 4 model parameters based on HadAM3 CMIP6 config. Do define OPT_ST_UKESM in your env.  ",
     "Developer_comment": "StudyConfig.py provides methods that work with this configuration file. Remember to change them if you change structure of this.",
     "version": 2,
     "version_comment": "Version ID",
-    "Name": "optUKESM1",
-    "Name_comment": "Study Name",
-    "baseRunID": "aa",
+    "Name": "XSTUDYNAMEX",
+    "Name_comment": "Study Name field overwritten by controlling Cylc suite",
+    "baseRunID": "ND",
     "baseRunID_comment": "base for runID. Only first two characters are generally used.",
     "runTime": null,
     "runTime_comment": "Time in seconds for run. ",
-    "runCode": null,
+    "runCode": "n02-optclim",
     "runCode_comment": "Project code to run job under.",
-    "machineName": "archer2",
+    "machineName": "slurm",
     "machineName_comment": "Name of machine to submit runs to",
     "modelName": "UKESM",
     "modelName_comment": "Name of model that is ran",
@@ -32,11 +32,7 @@
             "ENT_FAC_DP": 1.13,
             "ENT_FAC_DP_comment": "Deep entrainment amplitude",
             "AI": 2.57e-2,
-            "AI_comment": "Linear scaling on pwer-law behaviour for ice mass -- ice density",
-            "START_TIME": null,
-            "START_TIME_comment": "Start_time as ISO time or  3 to 6 element array [YYYY,MM,DD,hh,mm,mm]",
-            "RUN_TARGET": null,
-            "RUN_TARGET_comment": "Run target -- time as ISO time delta or 3 to 6 element array to run for. "
+            "AI_comment": "Linear scaling on pwer-law behaviour for ice mass -- ice density"
         },
         "initParams": {
             "comment": "Intial values for parameters to be optimised. Set to null to use default values.  ",
@@ -48,17 +44,16 @@
         "initScale": false,
         "initScale_comment": "If true then startParams range from 0 to 1 where 0 means min value; 1 max value. Fails to work when values are null and initScale is true",
         "fixedParams": {
-            "comment": " List of parameters and values that are fixed and not modified in optimisation. Set to null to use default values",
-            "START_TIME": null,
-            "RUN_TARGET": null
+            "comment": " List of parameters and values that are fixed and not modified in optimisation. Set to null to use default values"
         },
         "fixedScale": false,
         "fixedScale_comment": "If true then scalable fixedParams range from 0 to 1 where 0 means min value; 1 max value.",
         "minmax": {
             "comment": "Defines the minimum and maximum ranges for the parameters. Must be defined for ALL parameters used. From Sexton et al, 2021. See https://github.com/qump-project/qump-hadgem3",
+	    "commentOnEntFac":"fcm_make_um/extract/um/src/atmosphere/convection/cv_run_mod.F90 defines some also, tightened ent_fac_dp from intended 4 to 2",
             "DP_CORR_STRAT":[2500.0,40000],
-            "TWO_D_FSD_FACTOR":[1.0,2,0],
-            "ENT_FAC_DP": [0,4.0],
+            "TWO_D_FSD_FACTOR":[1.0,2.0],
+            "ENT_FAC_DP": [0,2.0],
             "AI": [6.1e-3,5.55e-2]
             },
         "steps": {
@@ -68,7 +63,7 @@
     },
     "study": {
         "comment": "Parameters that specify the study. Used by framework and not by optimisation routines",
-        "referenceModelDirectory": "$OPTCLIMTOP/Configurations/xhdiu_ia_tune",
+        "referenceModelDirectory": "$OPTCLIMTOP/Configurations/NOTUSED",
         "referenceModelDirectory_comment": "Directory where reference model configuration exists. Default is START_DIR/start. ",
         "covariance": {
             "comment": "Covariance matrices and operations on them. If CovObsErr and CovIntVar are *both* specified then CovTotal will be computed from them. TODO MOVE coviariance info somewhere else..",
@@ -76,11 +71,11 @@
             "CovTotal_Comment": "Name of file containing Covariance Matrix for total Error.",
             "CovTotalDiagonalise": false,
             "CovTotalDiagonalise_comment": "If true diagonalise the total covariance matrix",
-            "CovIntVar": "$OPT_UKESM/covariance/cov_intvar2012.csv",
+            "CovIntVar": "$OPT_ST_UKESM/covariance/cov_intvar2012.csv",
             "CovIntVar_Comment": "Name of file containing Covariance Matrix of Internal Variability.",
             "CovIntVarDiagonalise": false,
             "CovIntVarDiagonalise_comment": "If true diagonalise the internal variability covariance matrix",
-            "CovObsErr": "$OPT_UKESM/covariance/obserr2012.csv",
+            "CovObsErr": "$OPT_ST_UKESM/covariance/obserr2012.csv",
             "CovObsErr_Comment": "Name of file containing Covariance Matrix for Observational Error. ",
             "CovObsErrDiagonalise": true,
             "CovObsErrDiagonalise_comment": "If true diagonalise the Observational Error covariance matrix"
@@ -126,7 +121,7 @@
             "rhobeg_comment": "Radius of parameter trust region at start",
             "rhoend": 0.1,
             "rhoend_comment": "Radius of paramter trust region for termination (for our purpose this is in normalised parameters)",
-            "maxfun": 20,
+            "maxfun": 7,
             "maxfun_comment": "Maximum number of model evaluations to be done. Default is O(1000).   ",
             "scaling_within_bounds": true,
             "scaling_within_bounds_comment": "Scale internally so all in range 0 to 1",
@@ -178,20 +173,20 @@
     },
     "postProcess": {
         "comment": "Options to control post processing. Details depend on your post processing script. ",
-        "script": "$OPT_UKESM/post_process/comp_sim_obs_UKESM_atmos.py",
+        "script": "$OPT_ST_UKESM/post_process/my_simobs_wrapper.sh",
         "script_comment": "Full path name -- including any environment variables you might have -- to postprocessing script",
         "outputPath": "observations.json",
         "outputPath_comment": "Name of output path relative to model dir and should be one of .nc, .json or .csv. Default is observations.nc. ",
         "note": "Specify mask_file -- file where l/s mask is, name of mask, start and end times",
-        "mask_file": "$OPT_UKESM/configs/landfrac_N96.nc",
+        "mask_file": "$OPT_ST_UKESM/configs/landfrac_N96.nc",
         "mask_file_comment": "Path to mask file. Example value is for N96 HadGEM3",
         "mask_name": "field36",
         "mask_name_comment": "Name of mask variable. Depends on file..",
         "mask_fraction": 0.5,
         "mask_fraction_comment": "Critical Fraction. Specify if mask file is a land/sea fraction. Values >= are land < sea. Set to null if mask is a t/f mask",
-        "start_time": "2012-04-01",
+        "start_time": "2012-01-01",
         "start_time_comment": "Start time as ISO std string. ",
-        "end_time": "2013-04-01",
+        "end_time": "2012-02-02",
         "end_time_comment": "End time as str of ISO std string"
     },
     "targets": {

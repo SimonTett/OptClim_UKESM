@@ -1,0 +1,17 @@
+description=Copy of u-be303/archer2@221116
+info=THIS IS THE 1.0 RELEASE OF UKESM1.
+    =It is an atmosphere-only (AMIP) configuration.  Suites with
+    =settings for fully coupled configurations are also available,
+    =with settings for either a pre-industrial control experiment
+    =(originally named u-bc964) or a historical experiment
+    =(originally named u-bc613).
+    =
+    =For more information about this release, please see
+    =http://cms.ncas.ac.uk/wiki/UM/Configurations/UKESM/RelNotes1.0
+    =
+    =This configuration has no pp output &  netcdf output for small number of diagnostics.
+    =Run starts 2012-01-01 and runs for 15 months. No dumps or climate meaning. 
+    =To turn pp output back on then you need to enable output streams and usage profiles.
+owner=mjm
+project=UKESM
+title=UKESM1.0 AMIP for opt
