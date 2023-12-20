@@ -18,7 +18,7 @@ import numpy as np
 import xarray
 import iris
 import logging
-
+import sys
 import StudyConfig
 
 _name_pat = None
@@ -77,6 +77,10 @@ def read_UMfiles(files: typing.Iterable[pathlib.Path]) -> xarray.Dataset:
     :return: dataset
     """
     data_array_list = []
+    if len(files) == 0:
+        logging.warning("File list is empty")
+        return
+    
     cubes = iris.load(files)
     for cube in cubes:
         da = xarray.DataArray.from_iris(cube).rename(cube.name())
@@ -511,7 +515,11 @@ def do_work():
         rootdir = pathlib.Path.cwd() / path
     else:
         rootdir = pathlib.Path(args.dir)
-    file_pattern = options.get("file_pattern", '*a.py*.pp')  # file pattern to use.
+
+    if not rootdir.is_dir():
+        logging.warning(f"rootdir {rootdir} is not a dir")
+        sys.exit(1)
+    file_pattern = options.get("file_pattern", '*a.pm*.pp')  # file pattern to use.
     files = list(rootdir.glob(file_pattern))
 
     start_time = options.get('start_time')  # will use None to select.
@@ -520,8 +528,8 @@ def do_work():
 
     clean_files = []
     if args.clean:
-        clean_files = rootdir.glob("*a.d*_00")  # pattern for dumps
-        extra_files = rootdir.glob("*a.p[4,5,a,d,e,h,k,u,v]*") # all the dump headers  generated. No idea why!
+        clean_files = list(rootdir.glob("*a.d*_00"))  # pattern for dumps
+        extra_files = list(rootdir.glob("*a.p[4,5,a,b,c,d,e,f,g,h,i,j,k,u,v]*")) # all the dump headers  generated. No idea why!
         clean_files += extra_files
 
     if args.OUTPUT is None:
@@ -543,6 +551,10 @@ def do_work():
         if verbose > 1:
             print("options are ", options)
 
+    if len(files) ==0:
+        logging.warning("Failed to find any files")
+        sys.exit(1)
+
     results = compute_values(files, output_file, start_time=start_time, end_time=end_time,
                              land_mask_fraction=land_mask_fraction)
 
@@ -553,13 +565,15 @@ def do_work():
         print("============================================================")
 
     # and possibly clean the dumps
+    if len(clean_files) > 0:
+        logging.warning(f"Deleting {len(clean_files)} files. Sleeping 10")
+        time.sleep(10)
     for file in clean_files:
         if file.samefile(output_file) or file.suffix == '.pp' or file.suffix == 'nc':
             logging.warning(f"Asked to delete {file} but either output file, pp or netcdf so not.")
             continue
 
         logging.warning(f"Deleting {file}")
-        time.sleep(2.)
         file.unlink()  # remove it.
 
 
