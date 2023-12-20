@@ -8,7 +8,7 @@ rootdir=pathlib.Path(r"C:\Users\stett2\OneDrive - University of Edinburgh\data\O
 files = list(rootdir.glob('*a.pm*.pp'))
 with tempfile.NamedTemporaryFile(suffix='.json',delete=False) as tfile: # whne upgrade to 3.12 delete -> delete_on_close
     tfile.close()
-    results = compute_values(files,pathlib.Path(tfile.name))
+    results = compute_values(files,pathlib.Path(tfile.name),land_mask_fraction=0.5)
 
 #
 for name, value in results.items():
