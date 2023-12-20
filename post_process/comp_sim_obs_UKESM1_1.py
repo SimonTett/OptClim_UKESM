@@ -12,6 +12,7 @@ import json  # get JSON library
 import os  # OS support
 import pathlib
 import re
+import time
 import typing
 import numpy as np
 import xarray
@@ -462,7 +463,6 @@ def do_work():
         file_pattern -- glob pattern for files to read. Default is 'a.py*.pp' which will process annual mean pp.
         start_time -- start time as iso-format string for data selection. Default None
         end_time -- end time as iso-format string for data selection. Default None
-        clean_dumps -- if True dumps will be deleted. Default False
         outputPath -- if OUTPUT not provided on cmd line will define output file. Must be provided if OUTPUT not provided.
         land_mask_fraction -- fraction of area above which region is land. Default is 0.5
 
@@ -497,7 +497,7 @@ def do_work():
     parser.add_argument("-d", "--dir", help="The Name of the input directory")
     parser.add_argument("OUTPUT", nargs='?', default=None,
                         help="The name of the output file. Will override what is in the config file")
-    parser.add_argument("--clean", help="Clean all non pp data from directory", action='store_true')
+    parser.add_argument("--clean", help="Clean dumps from directory", action='store_true')
     parser.add_argument("-v", "--verbose", help="Provide verbose output", action="count", default=0)
     args = parser.parse_args()  # and parse the arguments
     # setup processing
@@ -517,9 +517,9 @@ def do_work():
     start_time = options.get('start_time')  # will use None to select.
     end_time = options.get('end_time')
     land_mask_fraction = options.get("land_mask_fraction",0.5)
-    clean_dumps = options.get('clean_dumps', False)
+
     clean_files = []
-    if clean_dumps:
+    if args.clean:
         clean_files = rootdir.glob("*a.d*_00")  # pattern for dumps
         extra_files = rootdir.glob("*a.p[4,5,a,d,e,h,k,u,v]*") # all the dump headers  generated. No idea why!
         clean_files += extra_files
@@ -559,6 +559,7 @@ def do_work():
             continue
 
         logging.warning(f"Deleting {file}")
+        time.sleep(2.)
         file.unlink()  # remove it.
 
 
