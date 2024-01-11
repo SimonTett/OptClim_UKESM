@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 
-""" Compute simulated observables using xarray.
-xarray appears to be a lot faster than iris!
- Based on comp_obs. Hopefully faster 
+""" 
+
+Compute simulated observables using iris (to read in pp datata) and xarray 
+to process. 
 Observations generated are in genProcess (or help for script)
 
  """
@@ -158,7 +159,8 @@ def guess_lat_lon_vert_names(dataArray):
     dims = dataArray.dims
     lat_patterns = ['latitude', 'lat']
     lon_patterns = ['longitude', 'lon']
-    vert_patterns = ['atmosphere_hybrid_sigma_pressure_coordinate', 'altitude', 'pressure', 'air_pressure',
+    vert_patterns = ['atmosphere_hybrid_sigma_pressure_coordinate',
+                     'altitude', 'pressure', 'air_pressure',
                      'model_level_number']
     lat_name = find_name(dims, lat_patterns)
     lon_name = find_name(dims, lon_patterns)
@@ -194,22 +196,21 @@ def total_column(data: typing.Optional[xarray.DataArray],
         (Atmospheric mass in layer is \Delta P/g)
     :param data: dataArray of the variable for which column calculation is being done. (or None)
         Assumed to be a mass mixing ratio (kg/kg)
-    :param atmos_mass: total mass of atmosphere.
+    :param atmos_mass: total mass/m^2 of atmosphere.
     :param scale:  scale factor.If None no scaling is done
     :return: total_column of substance
     """
     if data is None or atmos_mass is None:
         return None
     lat, lon, vertical_coord = guess_lat_lon_vert_names(data)
-    area = np.cos(np.deg2rad(data[lat])) * 6371e3  # simple cos lat weighting.
-    col = (data * atmos_mass).sum(vertical_coord) / area  # work out column  by integrating and dividing by area.
+    col = (data * atmos_mass).sum(vertical_coord)  # work out column  by integrating and dividing by area.
     if scale is not None:
         col *= scale
 
     return col
 
 
-def names(dataset, name=None):
+def names(dataset:xarray.Dataset, name=None):
     """
      Return dictionary of standard (or long or stash)  names for each variable in a dataset.
 
@@ -326,6 +327,11 @@ def genProcess(dataset:xarray.Dataset, land_mask:xarray.Dataset) -> typing.Dict[
     # set up the data to be meaned. Because of xarray's use of dask no processed  happens till
     # spatial (And temporal ) means computed. See means.
     mass = name_fn('m01s50i063', dataset, name_type='stash')
+    if mass is not None: # convert to mass/m^2
+        lat, lon, vertical_coord = guess_lat_lon_vert_names(mass)
+        area = np.cos(np.deg2rad(mass[lat])) * 6371e3  # simple cos lat weighting.
+        mass /= area # convert to per m^2
+
     process = {
         'OLR': name_fn('toa_outgoing_longwave_flux', dataset, name_type='standard'),
         'OLRC': name_fn('toa_outgoing_longwave_flux_assuming_clear_sky', dataset, name_type='standard'),
