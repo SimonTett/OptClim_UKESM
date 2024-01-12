@@ -1,0 +1,8 @@
+# Set up env for OptCLIMVN2 (as needed by UKESM1)
+OPTCLIMTOP=${OPTCLIMTOP:-/exports/csce/datastore/geos/groups/OPTCLIM/software/ModelOptimisation/}
+echo "OPTCLIMTOP is $OPTCLIMTOP"
+export OPT_ST_UKESM=/exports/csce/datastore/geos/groups/OPTCLIM/OptClim_UKESM
+module load /scratch/mjm/Modules/clim_python_latest
+export PATH=$OPTCLIMTOP/tools/:$OPT_ST_UKESM/comp_obs:$PATH
+export PYTHONPATH=$OPTCLIMTOP:$OPTCLIMTOP/OptClimVn2:$PYTHONPATH
+

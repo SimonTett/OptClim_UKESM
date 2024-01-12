@@ -1,14 +1,14 @@
-Software to support UKESM1 data processing
+Software to support UKESM1.1 data processing
 You need:
-1) comp_sim_obs_UKESM_atmos.py which actually does the data post processing. 
+1) post_process/comp_sim_obs_UKESM1_1.py (wrapped by simobs_wrapper_UKESM1_1.sh)
    It expects to either run in the directory with netcdf files or 
    to be given the directory. See its documentation. 
-2) UKESM_test_opt.json -- config file
+2) configs/UKESM_1_1_opt.json -- config file
 3) Set up the environment var OPT_UKESM to point to the root dir for the UKESM stuff!
 
 To test put your self in OPT_UKESM and do:
 
-./post_process/comp_sim_obs_UKESM_atmos.py configs/UKESM_test_opt.json -d test_data/test_UKESM_nc/History_Data/
+./post_process/comp_sim_obs_UKESM1_1.py configs/configs/UKESM_1_1_opt.json  -d <PATH_TO_PP_DATA)
 
 You can check the values in observations.json against the *standard* values in configs/UKESM_test_opt.json .
 
@@ -20,10 +20,10 @@ work. But for same period as post-processing will run for. Given we
 are trialing approach this is reasonable.
 
 1) Produce summary observed values. 
-comp_obs_values.py configs/UKESM_test_opt.json output_obs2012.json  ../HadCM3-CMIP6/data/Observations/*/*_N48*.nc --verbose
+configs/UKESM_1_1_opt.json output_obs2011.json ../HadCM3-CMIP6/data/Observations/*/*_N48*.nc --verbose
 
 2) Re-process those to make tgt & covariance csv files.
-./make_obs_targets_covar.py output_obs2012.json tgt2012.json covariance/obserr2012.csv
+make_obs_targets_covar.py output_obs2011.json tgt2011.json covariance/obserr2011.csv
 
 3) Include the tgt in the main config file. 
 And remember to commit/push to git.
