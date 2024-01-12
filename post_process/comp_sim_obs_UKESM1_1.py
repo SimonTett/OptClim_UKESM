@@ -423,6 +423,7 @@ def means(dataArray, name):
 
 def compute_values(files: typing.Iterable[pathlib.Path],
                    output_file: pathlib.Path,
+                   land_mask:xarray.DataArray,
                    start_time: typing.Optional[str] = None,
                    end_time: typing.Optional[str] = None,
                    land_mask_fraction:float = 0.5) -> typing.Dict:
@@ -436,7 +437,7 @@ def compute_values(files: typing.Iterable[pathlib.Path],
     """
     dataset = read_UMfiles(files)
     dataset = dataset.sel(time=slice(start_time, end_time))
-    land_mask = dataset.land_area_fraction.isel(time=0).squeeze()  # land/sea mask
+#    land_mask = dataset.land_area_fraction.isel(time=0).squeeze()  # land/sea mask
     land_mask = xarray.where(land_mask > land_mask_fraction, True, False)
     process = genProcess(dataset, land_mask)
 
@@ -528,8 +529,11 @@ def do_work():
     file_pattern = options.get("file_pattern", '*a.pm*.pp')  # file pattern to use.
     files = list(rootdir.glob(file_pattern))
 
-    start_time = options.get('start_time')  # will use None to select.
+    start_time = options.get('start_time')  # will use None to select all data
     end_time = options.get('end_time')
+    land_mask_file = expand(options['mask_file'])
+    land_mask_var = options.get('mask_variable','field36')
+    
     land_mask_fraction = options.get("land_mask_fraction",0.5)
 
     clean_files = []
@@ -554,14 +558,18 @@ def do_work():
         print("output", output_file)
         print("clean_files", clean_files)
         print("file_pattern", file_pattern)
+        print("land_mask_file",land_mask_file)
         if verbose > 1:
             print("options are ", options)
 
     if len(files) ==0:
-        logging.warning("Failed to find any files")
-        sys.exit(1)
+        ValueError("Failed to find any files. Exiting")
 
-    results = compute_values(files, output_file, start_time=start_time, end_time=end_time,
+
+    land_mask = xarray.load_dataset(land_mask_file,decode_times=False)[land_mask_var]
+
+    results = compute_values(files, output_file,land_mask,
+                             start_time=start_time, end_time=end_time,
                              land_mask_fraction=land_mask_fraction)
 
 

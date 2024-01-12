@@ -1,0 +1,6 @@
+# Set up env for OptCLIMVN2 (as needed by UKESM1) on archer2
+. /work/n02/shared/mjmn02/OptClim/setup_optclim2.sh 
+echo "OPTCLIMTOP is $OPTCLIMTOP"
+export OPT_ST_UKESM=/work/n02/shared/tetts/OptClim_UKESM/
+export PATH=$OPT_ST_UKESM/comp_obs:$PATH
+
