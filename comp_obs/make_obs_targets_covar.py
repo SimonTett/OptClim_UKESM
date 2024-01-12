@@ -60,7 +60,7 @@ BEST = 'BEST/Complete_TAVG_LatLong1_fix_N48.nc'
 rewrite_rules = dict()  # rewrite rules -- only these ones will be used!
 rewrite_rules[CERES] = dict(toa_sw_all_mon='RSR', toa_lw_all_mon='OLR',
                             toa_net_all_mon='netflux',
-                            toa_sw_clr_c_mon='RSRC', toa_lw_clr_c_mon='LWC',
+                            toa_sw_clr_c_mon='RSRC', toa_lw_clr_c_mon='OLRC',
                             )
 rewrite_rules[CRU_TS_precip] = dict(pre='Lprecip')
 rewrite_rules[GPCC] = dict(precip='extra_Lprecip')
