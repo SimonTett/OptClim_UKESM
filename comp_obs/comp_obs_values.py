@@ -114,10 +114,18 @@ for file in files:
             if verbose:
                 print("Scaling ERA5 precip to kg/second from m/day")
             var *= 1000/(24*60*60.)
-        if unit == 'mm/month':
+        elif unit == 'mm/month':
             var /= var.time.dt.days_in_month*24*60*60 # convert to kg/sec
-        if (unit == "degrees Celsius") or (unit == 'degree C'): # convert to K 
+        elif (unit == "degrees Celsius") or (unit == 'degree C'): # convert to K 
             var += 273.16
+        elif unit == 'microns':
+            var *=1e-6
+            if verbose:
+                print(f"Converting from microns to m for {var.name}")
+        
+        else:
+            pass # nothing to do.
+
         try:
             latitude_coord = list(var.coords.dims)[2]
             latitude_coord = 'latitude'
@@ -125,6 +133,7 @@ for file in files:
             continue
         name = v
         mn_values = means(var, name, latitude_coord=latitude_coord)
+
         # now potentially deal with pressure
         if v in ['msl','mslp']:
             if verbose:

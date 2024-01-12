@@ -224,10 +224,10 @@
     "diff_new_old_method_SHX": -7.14466229354067e-07
   },
   "MODIS/MODIS_AQUA_Reff_N48.nc": {
-    "Cloud_Effective_Radius_Liquid_GLOBAL": 14.359146133541856,
-    "Cloud_Effective_Radius_Liquid_NHX": 12.506567555540895,
-    "Cloud_Effective_Radius_Liquid_TROPICS": 15.51338513559003,
-    "Cloud_Effective_Radius_Liquid_SHX": 13.526771334569421
+    "Cloud_Effective_Radius_Liquid_GLOBAL": 1.4359146133541863e-05,
+    "Cloud_Effective_Radius_Liquid_NHX": 1.2506567555540898e-05,
+    "Cloud_Effective_Radius_Liquid_TROPICS": 1.5513385135590017e-05,
+    "Cloud_Effective_Radius_Liquid_SHX": 1.352677133456942e-05
   },
   "NCEP2/air_500.mon.mean_N48.nc": {
     "air_GLOBAL": 258.4022041094949,
