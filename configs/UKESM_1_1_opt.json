@@ -211,7 +211,7 @@
       "file_pattern_comment":"pattern to match files to process"
   },
   "targets": {
-      "_comment": "Values for 2011/01/01-2011/12/31",
+      "_comment": "Values for 2011/01/01-2011/12/31. All values should be SI",
       "RSR_NHX": 100.92789653071071,
       "RSR_TROPICS": 94.351948436291,
       "RSR_SHX": 108.07003375702631,
