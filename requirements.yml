@@ -1,0 +1,22 @@
+name: Opt_UKESM1
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - pip
+  - scitools-iris
+  - pip: # install what we can with pip
+    - metomi-rose==2.2.0 # avoid most recent version.
+    - scikit-learn == 1.6
+    - f90nml
+    - xarray[complete]==2025.7
+    - xarray-regrid
+    - xarray-units
+    - numpy == 2.2
+    - pandas
+    - matplotlib
+    - cftime
+    - ipython
+    - numpy
+    - scipy == 1.15
+

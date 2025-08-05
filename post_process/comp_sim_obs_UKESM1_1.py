@@ -21,6 +21,7 @@ import iris
 import logging
 import sys
 import StudyConfig
+import UKESMlib
 
 _name_pat = None
 
@@ -94,7 +95,7 @@ def read_UMfiles(files: typing.Iterable[pathlib.Path]) -> xarray.Dataset:
     return dataSet
 
 
-def merge_dataArray(dataArray_list: typing.List[xarray.DataArray]) -> xarray.Dataset:
+def merge_dataArray(dataArray_list: list[xarray.DataArray]) -> xarray.Dataset:
     """
     Merge (renaming list of dataArrays. dataArarrays and co-ords will be renamed if they have duplicated names but different values  )
     :param dataArray_list: List of dataArrays to be merged
@@ -136,37 +137,37 @@ def expand(filestr: str) -> pathlib.Path:
     return path
 
 
-def guess_lat_lon_vert_names(dataArray):
-    """
-    Guess the names of latitude, longitude & vertical co-ords in the dataArray
-    starts with latitude/longitude, then lat/lon, then latitude_N/longitude_N then lat_N,lon_N
-    and with atmosphere_hybrid_sigma_pressure_coordinate, altitude, air_pressure for vertical
-
-    :param dataArray:
-    :return: latitude, longitude & vertical co-ord names
-    """
-
-    def find_name(dimensions, patterns):
-        name = None
-        for pattern in patterns:
-            reg = re.compile("^" + pattern + r"(_\d+)?" + "$")
-            for d in dimensions:
-                if reg.match(d):
-                    name = d
-                    break
-        return name
-
-    dims = dataArray.dims
-    lat_patterns = ['latitude', 'lat']
-    lon_patterns = ['longitude', 'lon']
-    vert_patterns = ['atmosphere_hybrid_sigma_pressure_coordinate',
-                     'altitude', 'pressure', 'air_pressure',
-                     'model_level_number']
-    lat_name = find_name(dims, lat_patterns)
-    lon_name = find_name(dims, lon_patterns)
-    vert_name = find_name(dims, vert_patterns)
-
-    return lat_name, lon_name, vert_name
+# def guess_lat_lon_vert_names(dataArray):
+#     """
+#     Guess the names of latitude, longitude & vertical co-ords in the dataArray
+#     starts with latitude/longitude, then lat/lon, then latitude_N/longitude_N then lat_N,lon_N
+#     and with atmosphere_hybrid_sigma_pressure_coordinate, altitude, air_pressure for vertical
+#
+#     :param dataArray:
+#     :return: latitude, longitude & vertical co-ord names
+#     """
+#
+#     def find_name(dimensions, patterns):
+#         name = None
+#         for pattern in patterns:
+#             reg = re.compile("^" + pattern + r"(_\d+)?" + "$")
+#             for d in dimensions:
+#                 if reg.match(d):
+#                     name = d
+#                     break
+#         return name
+#
+#     dims = dataArray.dims
+#     lat_patterns = ['latitude', 'lat']
+#     lon_patterns = ['longitude', 'lon']
+#     vert_patterns = ['atmosphere_hybrid_sigma_pressure_coordinate',
+#                      'altitude', 'pressure', 'air_pressure',
+#                      'model_level_number']
+#     lat_name = find_name(dims, lat_patterns)
+#     lon_name = find_name(dims, lon_patterns)
+#     vert_name = find_name(dims, vert_patterns)
+#
+#     return lat_name, lon_name, vert_name
 
 
 def model_delta_p(pstar, a_bounds, b_bounds):
@@ -190,7 +191,7 @@ def model_delta_p(pstar, a_bounds, b_bounds):
 
 def total_column(data: typing.Optional[xarray.DataArray],
                  atmos_mass: typing.Optional[xarray.DataArray],
-                 scale: typing.Optional[float] = None):
+                 scale: typing.Optional[float] = None) -> xarray.DataArray:
     """
     Compute total column of substance (kg/m^2) assuming hydrostatic atmosphere.
         (Atmospheric mass in layer is \Delta P/g)
@@ -202,7 +203,7 @@ def total_column(data: typing.Optional[xarray.DataArray],
     """
     if data is None or atmos_mass is None:
         return None
-    lat, lon, vertical_coord = guess_lat_lon_vert_names(data)
+    lat, lon, vertical_coord,_ = UKESMlib.guess_coordinate_names(data)
     col = (data * atmos_mass).sum(vertical_coord)  # work out column  by integrating and dividing by area.
     if scale is not None:
         col *= scale
@@ -243,13 +244,94 @@ def names(dataset:xarray.Dataset, name=None):
     return lookup
 
 
-def reff(dataset):
+def modis_reff(dataset):
     reffwt = dataset.get('m01s02i463')  # COSP MODIS weighted liquid Reff
-    wt = dataset.get('m01s02i452')  # COSP MODIS weight
+    wt = dataset.get('m01s02i330')  # COSP MODIS weight
     if (reffwt is None) or (wt is None):
         logging.warning("Failed to find reffwt or wt")
         return None
-    return reffwt / wt
+    result = reffwt.where(wt > 1e-5) / wt  # compute the effective radius
+    return result
+
+def modis_reff_ice(dataset):
+    reffwt = dataset.get('m01s02i464')  # COSP MODIS weighted ice  Reff
+    wt = dataset.get('m01s02i330')  # COSP MODIS weight
+    if (reffwt is None) or (wt is None):
+        logging.warning("Failed to find reffwt or wt")
+        return None
+    result = reffwt.where(wt > 1e-5) / wt  # compute the effective radius
+    return result
+
+def modis_cld_total(dataset):
+    """
+    Compute the total cloud fraction from MODIS data.
+    :param dataset: xarray dataset containing MODIS data
+    :return: total cloud fraction as a DataArray
+    """
+    cld_frac = dataset.get('m01s02i451')  # COSP MODIS cloud fraction
+    wt = dataset.get('m01s02i330')  # COSP MODIS weight
+    if cld_frac is None or wt is None:
+        logging.warning("Failed to find MODIS cloud fraction or wt")
+        return None
+    result = cld_frac.where(wt > 1e-5) / wt  # compute the total cloud fraction
+    return result
+
+def modis_cld_liquid(dataset):
+    """
+    Compute the total cloud fraction from MODIS data.
+    :param dataset: xarray dataset containing MODIS data
+    :return: total cloud fraction as a DataArray
+    """
+    cld_frac = dataset.get('m01s02i452')  # COSP MODIS liquid cloud fraction
+    wt = dataset.get('m01s02i330')  # COSP MODIS weight
+    if cld_frac is None or wt is None:
+        logging.warning("Failed to find MODIS liquid cloud fraction or wt")
+        return None
+    result = cld_frac.where(wt > 1e-5) / wt  # compute the total cloud fraction
+    return result
+
+def modis_cld_ice(dataset):
+    """
+    Compute the ice cloud fraction from MODIS data.
+    :param dataset: xarray dataset containing MODIS data
+    :return: total ice cloud fraction as a DataArray
+    """
+    cld_frac = dataset.get('m01s02i453')  # COSP MODIS ice cloud fraction
+    wt = dataset.get('m01s02i330')  # COSP MODIS weight
+    if cld_frac is None or wt is None:
+        logging.warning("Failed to find MODIS ice cloud fraction or wt")
+        return None
+    result = cld_frac.where(wt > 1e-5) / wt  # compute the total cloud fraction
+    return result
+
+def modis_cld_ice(dataset):
+    """
+    Compute the ice cloud fraction from MODIS data.
+    :param dataset: xarray dataset containing MODIS data
+    :return: total ice cloud fraction as a DataArray
+    """
+    cld_frac = dataset.get('m01s02i453')  # COSP MODIS ice cloud fraction
+    wt = dataset.get('m01s02i330')  # COSP MODIS weight
+    if cld_frac is None or wt is None:
+        logging.warning("Failed to find MODIS ice cloud fraction or wt")
+        return None
+    result = cld_frac.where(wt > 1e-5) / wt  # compute the total cloud fraction
+    return result
+
+def modis_cld_top_pressure(dataset):
+    """
+    Compute the cloud top pressure from MODIS data.
+    :param dataset: xarray dataset containing MODIS data
+    :return: CTP as a DataArray
+    """
+    ctp = dataset.get('m01s02i465')  # COSP MODIS ctp
+    wt = dataset.get('m01s02i330')  # COSP MODIS weight
+    if ctp is None or wt is None:
+        logging.warning("Failed to find MODIS ctp or wt")
+        return None
+    result = ctp.where(wt > 1e-5) / wt  # compute the total cloud fraction
+    return result
+
 
 
 def genProcess(dataset:xarray.Dataset, land_mask:xarray.Dataset) -> typing.Dict[str,xarray.DataArray]:
@@ -320,15 +402,15 @@ def genProcess(dataset:xarray.Dataset, land_mask:xarray.Dataset) -> typing.Dict[
                 return None
         return da
 
-    latitude_coord, lon, vert = guess_lat_lon_vert_names(dataset[lookup_stash['m01s03i236']])  # 1.5 m air tempo.
+    latitude_coord, lon, vert,tc = UKESMlib.guess_coordinate_names(dataset[lookup_stash['m01s03i236']])  # 1.5 m air tempo.
     constrain_60S = dataset[latitude_coord] >= -60.
     # need to extract the actual values...
-    constrain_60S = constrain_60S.latitude[constrain_60S]
+    constrain_60S = constrain_60S[latitude_coord][constrain_60S]
     # set up the data to be meaned. Because of xarray's use of dask no processed  happens till
     # spatial (And temporal ) means computed. See means.
     mass = name_fn('m01s50i063', dataset, name_type='stash')
     if mass is not None: # convert to mass/m^2
-        lat, lon, vertical_coord = guess_lat_lon_vert_names(mass)
+        lat, lon, vertical_coord,_ = UKESMlib.guess_coordinate_names(mass)
         area = np.cos(np.deg2rad(mass[lat])) * 6371e3  # simple cos lat weighting.
         mass /= area # convert to per m^2
 
@@ -338,12 +420,15 @@ def genProcess(dataset:xarray.Dataset, land_mask:xarray.Dataset) -> typing.Dict[
         'RSR': name_fn('toa_outgoing_shortwave_flux', dataset, name_type='standard'),
         'RSRC': name_fn('toa_outgoing_shortwave_flux_assuming_clear_sky', dataset, name_type='standard'),
         'INSW': name_fn('toa_incoming_shortwave_flux', dataset, name_type='standard'),
-        'LAT': xarray.where(land_mask, dataset[lookup_stash['m01s03i236']], np.nan).sel(
-            {latitude_coord: constrain_60S}),
-        'Lprecip': xarray.where(land_mask, dataset[lookup_std['precipitation_flux']], np.nan).sel(
-            {latitude_coord: constrain_60S}),
+        'T2m': dataset[lookup_stash['m01s03i236']].sel({latitude_coord: constrain_60S}),
+        'Precip': dataset[lookup_std['precipitation_flux']].sel({latitude_coord: constrain_60S}),
         'MSLP': dataset[lookup_std['air_pressure_at_sea_level']],
-        'Reff': reff(dataset),
+        'Reff': modis_reff(dataset),
+        'Reff_ice': modis_reff_ice(dataset),
+        'cld_total': modis_cld_total(dataset),
+        'cld_liquid': modis_cld_liquid(dataset),
+        'cld_ice': modis_cld_ice(dataset),
+        'cld_top_pressure': modis_cld_top_pressure(dataset),
         # SO2 related. Except SO2_col the rest are for HadXM3 and will need updating.
         'SO2_col': total_column(name_fn('mass_fraction_of_sulfur_dioxide_in_air', dataset, name_type='name'),
                                 mass),
@@ -398,7 +483,7 @@ def means(dataArray, name):
 
     """
 
-    latitude_coord, lon, vert = guess_lat_lon_vert_names(dataArray)
+    latitude_coord, lon, vert,_ = UKESMlib.guess_coordinate_names(dataArray)
 
     wt = np.cos(np.deg2rad(dataArray[latitude_coord]))  # simple cos lat weighting.
     # constraints and names for regions.
@@ -451,10 +536,6 @@ def compute_values(files: typing.Iterable[pathlib.Path],
         results.update(mean)  # and stuff them into the results dict.
         logging.debug(f"Processed {name} and got {mean}")
 
-    # now fix the MSLP values. Need to remove the global mean from values and the drop the SHX value.
-    results.pop('MSLP_SHX')
-    for k in ['MSLP_NHX', 'MSLP_TROPICS']:
-        results[k + '_DGM'] = results.pop(k) - results['MSLP_GLOBAL']
 
     # now to write the data
     with open(output_file, 'w') as fp:
