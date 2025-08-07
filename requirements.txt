@@ -1,0 +1,13 @@
+metomi-rose==2.2.0 # avoid most recent version.
+scikit-learn == 1.6
+f90nml
+xarray[complete]==2025.7
+xarray-regrid
+numpy == 2.2
+pandas
+matplotlib
+cftime
+ipython
+numpy
+scipy == 1.15
+

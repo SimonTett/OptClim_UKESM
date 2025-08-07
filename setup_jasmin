@@ -1,0 +1,8 @@
+# setup env for jasmin
+module load jaspy
+# work out where this script is and add paths relative to it
+export OPT_UKESM_ROOT=$( dirname -- "$( readlink -f -- "$0"; )";)
+source $OPT_UKESM_ROOT/Opt_UKESM/bin/activate
+export PATH=$OPT_UKESM_ROOT/processing:$PATH
+export PYTHONPATH=$OPT_UKESM_ROOT:$PYTHONPATH
+
