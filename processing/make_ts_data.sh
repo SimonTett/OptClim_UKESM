@@ -3,13 +3,23 @@
 export PYTHONUNBUFFERED=1 # no buffering for python.
 data_dir=/gws/nopw/j04/terrafirma/tetts/data/obs_data
 ts_dir=${data_dir}/ts_data # where the timeseries data is stored.
-sw_dir=~/tetts/OptClim_UKESM/
-export PATH=$PATH:${sw_dir}/processing:${sw_dir}/post_process
+if [[ -z ${OPT_UKESM_ROOT} ]]
+then
+    echo "OPT_UKESM_ROOT is not set. Exiting"
+    exit 1
+fi
+echo "OPT_UKESM_ROOT: ${OPT_UKESM_ROOT}"
+source $OPT_UKESM_ROOT/Opt_UKESM/bin/activate # setup python env. No idea why it needs to be done
+##sw_dir=~/tetts/OptClim_UKESM/
+##export PATH=$PATH:${sw_dir}/processing:${sw_dir}/post_process
 # activate the environment before running the script.
-cmd_root="comp_regional_ts.py  --land_sea_file ${sw_dir}/post_process/land_frac.nc --nooverwrite --output_file "
+echo  $VIRTUAL_ENV
+mkdir -p $ts_dir
+
+cmd_root="comp_regional_ts.py  --land_sea_file ${OPT_UKESM_ROOT}/post_process/land_frac.nc --nooverwrite --output_file "
 
 # run process_modis_aatsr.py to process the modis and aatsr data.
-process_modis_aatsr ${data_dir}
+process_modis_aatsr.py ${data_dir}
 # and to fix problems with BEST data
 convert_BEST.py ${data_dir}/BEST/Complete_TAVG_LatLong1.nc
 
@@ -29,13 +39,13 @@ echo "Processing CRUTS tmn with $cmd"
 $($cmd) # CRU_TS
 
 # CRU_TS precip
-cmd="${cmd_root} ${ts_dir}/CRU_TS_pre_ts.nc ${data_dir}/CRU_TS/cru_ts4.09.2*.pre.dat.nc --variables pre -- rename pre:Precip"
+cmd="${cmd_root} ${ts_dir}/CRU_TS_pre_ts.nc ${data_dir}/CRU_TS/cru_ts4.09.2*.pre.dat.nc --variables pre --rename pre:Precip"
 echo "Processing CRUTS pre with $cmd"
 $($cmd) # CRU_TS
 
 
 # GPCC precip
-cmd="${cmd_root} ${ts_dir}/GPCC_ts.nc ${data_dir}/GPCC/full_data*.nc --variables precip -- rename precip:Precip"
+cmd="${cmd_root} ${ts_dir}/GPCC_ts.nc ${data_dir}/GPCC/full_data*.nc --variables precip --rename precip:Precip"
 echo "Processing CRUTS pre with $cmd"
 $($cmd) # CRU_TS
 

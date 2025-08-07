@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 """
 Process MODIS and AATSR cloud data to extract relevant variables, regrid, and mask overlapping data.#
 MODIS data is extracted from MCD06COSP_M3_MODIS files, while AATSR data is extracted from ESACCI-L3C_CLOUD-CLD_PRODUCTS-AATSR_ENVISAT files.
@@ -99,16 +99,20 @@ match_dir = {'Cloud_Mask_Fraction':'cfc',
              'Cloud_Particle_Size_Ice': 'cer_ice'}
 base_dir = args.base_dir
 modis_dir = base_dir / "modis_cloud"
-aatsr_dir = base_dir / "aatsr_cloud"
+aatsr_dir = base_dir / "AATSR_cloud"
 extract_modis_dir = base_dir / "modis_cloud_extract"
 extract_aatsr_dir = base_dir / "aatsr_cloud_extract"
 for dir in [extract_modis_dir, extract_aatsr_dir]:
     dir.mkdir(parents=True, exist_ok=True)  # Create directories if they do not exist
 
 modis_files = list(modis_dir.glob("MCD06COSP_M3_MODIS.A*.062.2022*.nc"))
+my_logger.info(f'Will be processing {len(modis_files)} modis files')
 aatsr_files = list(
     aatsr_dir.glob("*-ESACCI-L3C_CLOUD-CLD_PRODUCTS-AATSR_ENVISAT-fv3.0.nc"))  # just want the AATSR files.
+my_logger.info(f'Will be processing {len(aatsr_files)} aatsr files')
+
 # need the times for MODIS as they are stored as attributes and need to be converted to datetime
+
 time = []
 time_bounds = []
 modis_attrs = None
@@ -123,6 +127,7 @@ for file in modis_files:
             for v in ['time_coverage_start', 'time_coverage_end']:  # attributes we do not want.
                 modis_attrs.pop(v, None)
 
+my_logger.info(f"Read in modis metadata from {len(modis_files)} files")
 # add in a history entry
 modis_attrs['history'] = modis_attrs.pop('history', '') + f' Processed MODIS data using {pathlib.Path(__file__).name}.'
 
@@ -133,9 +138,11 @@ time_bounds = xarray.DataArray(time_bounds, dims=['time', 'nbounds'],
                                attrs={'long_name': 'time_bounds', 'standard_name': 'time_bounds'})
 longitude = ds.longitude
 latitude = ds.latitude
-
+my_logger.info(f"Opening aatsr datat for  {len(aatsr_files)} files")
 aatsr_data = xarray.open_mfdataset(aatsr_files, combine='nested', concat_dim='time')
+my_logger.info(f"Opened aatsr datat for  {len(aatsr_files)} files")
 aatsr_cld_phase_fraction = ice_liq_cld_fraction(aatsr_data)  # compute liquid and ice cloud fractions
+
 aatsr_all_data = xarray.merge([aatsr_data, aatsr_cld_phase_fraction], compat='equals')
 for modis_grp, aatsr_var in match_dir.items():
     out_file = extract_modis_dir / f"{modis_grp}.nc"

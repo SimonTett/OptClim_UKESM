@@ -16,10 +16,10 @@ import argparse
 import logging
 import pathlib
 from typing import List, Optional, Tuple, Dict, Any
-
+import numpy as np
 import xarray
 import xarray_regrid # regridding in xarray
-import warnings # sp we cam suppress warnings from dask
+
 
 import UKESMlib
 
@@ -126,8 +126,7 @@ def process_files(input_files: list[str],
 
         my_logger.info(f'Processing {ds.data_vars.keys()} variables')
 
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore:RuntimeWarning: invalid value encountered in divide")
+        with  np.errstate(divide='ignore', invalid='ignore'):
             regridded = conservative_regrid(ds, land_fract )  # regrid to land fraction grid
 
             regridded = regridded.load() # force the load
@@ -177,7 +176,7 @@ def main():
     group.add_argument('--overwrite', dest='overwrite', action='store_true', help='Enable overwrite')
     group.add_argument('--nooverwrite', dest='overwrite', action='store_false', help='Disable overwrite')
     parser.set_defaults(overwrite=False)
-    parser.add_argument('--log_level', type=str, default='warning', help='Log level of of the script')
+    parser.add_argument('--log_level', type=str, default='WARNING', help='Log level of of the script')
     parser.add_argument('--rename', type=str, nargs='+',default=None,help='Pairs of variable names to rename in the form old_name:new_name, e.g. tas:temperature')
     args = parser.parse_args()
 
