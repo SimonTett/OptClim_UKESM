@@ -10,6 +10,7 @@ import pathlib
 import logging
 import numpy as np
 import argparse
+import UKESMlib
 
 my_logger = logging.getLogger(__name__)
 if my_logger.hasHandlers():
@@ -105,9 +106,9 @@ extract_aatsr_dir = base_dir / "aatsr_cloud_extract"
 for dir in [extract_modis_dir, extract_aatsr_dir]:
     dir.mkdir(parents=True, exist_ok=True)  # Create directories if they do not exist
 
-modis_files = list(modis_dir.glob("MCD06COSP_M3_MODIS.A*.062.2022*.nc"))
+modis_files = sorted(modis_dir.glob("MCD06COSP_M3_MODIS.A*.062.2022*.nc"))
 my_logger.info(f'Will be processing {len(modis_files)} modis files')
-aatsr_files = list(
+aatsr_files = sorted(
     aatsr_dir.glob("*-ESACCI-L3C_CLOUD-CLD_PRODUCTS-AATSR_ENVISAT-fv3.0.nc"))  # just want the AATSR files.
 my_logger.info(f'Will be processing {len(aatsr_files)} aatsr files')
 
@@ -144,6 +145,7 @@ my_logger.info(f"Opened aatsr datat for  {len(aatsr_files)} files")
 aatsr_cld_phase_fraction = ice_liq_cld_fraction(aatsr_data)  # compute liquid and ice cloud fractions
 
 aatsr_all_data = xarray.merge([aatsr_data, aatsr_cld_phase_fraction], compat='equals')
+aatsr_all_data = aatsr_all_data.sortby('time')
 for modis_grp, aatsr_var in match_dir.items():
     out_file = extract_modis_dir / f"{modis_grp}.nc"
     out_aatsr_file = extract_aatsr_dir / f"{modis_grp}.nc"
@@ -161,19 +163,21 @@ for modis_grp, aatsr_var in match_dir.items():
 
         # add in metadata
         modis = modis.assign_attrs(modis_attrs)  # Assign the attributes from the first file
-
+        
         modis.to_netcdf(out_file, format='NETCDF4')  # Save the MODIS data to a netCDF file
         my_logger.info(f'Processed MODIS data written to {out_file}')
         # check for overlap.
         overlap = np.intersect1d(modis.time.values, aatsr_all_data.time.values)
         has_overlap = overlap.size > 0
         if has_overlap:  # got some overlapping data.
+            time_slice = slice(modis.time.min().values, modis.time.max().values)
             my_logger.info('Overlapping data found between MODIS and AATSR datasets. Regridding and Masking')
+            
 
-            aatsr = aatsr_all_data[aatsr_var].rename(lon='longitude', lat='latitude').sel(
-                time=slice(modis.time.min(), modis.time.max()))  # Load the AATSR variable
-            aatsr = aatsr.rename(modis_grp)  # Rename to match MODIS variable
-            aatsr = aatsr.regrid.conservative(modis[modis_grp]).compute()  # regrid to MODIS grid.
+            aatsr = aatsr_all_data[aatsr_var].rename(lon='longitude', lat='latitude').sel(time=time_slice)  # Load the AATSR variable
+            aatsr = aatsr.rename(modis_grp).compute()  # Rename to match MODIS variable
+            with  np.errstate(divide='ignore', invalid='ignore'):
+                aatsr = UKESMlib.conservative_regrid(aatsr,modis[modis_grp])  # regrid to MODIS grid.
             aatsr = aatsr.where(~np.isnan(modis[modis_grp]), drop=True)  # mask aatsr data by MODIS data
             time_bounds_aatsr = modis['time_bounds'].sel(time=aatsr.time)  # Get the time bounds for AATSR
 

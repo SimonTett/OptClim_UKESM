@@ -2,7 +2,24 @@ import xarray
 import typing
 import logging
 import numpy as np
+import socket
+import pathlib
+import os 
 logger = logging.getLogger(__name__)
+
+## work out base-dirs for data depening on machine
+host = socket.gethostname()
+try:
+    base_dir = pathlib.Path(os.getenv('BASE_DIR'))
+except TypeError as e: # failed coz BASE_DIR does not exist
+    logger.warning('BASE_DIR not in env')
+    if host.startswith('GEOS-W'):  # Geos windows dekstop
+        base_dir = pathlib.Path(r"P:\optclim_data")
+    else:
+        raise ValueError('Do not know how to define base_dir.  Define BASE_DIR or modify code')
+
+
+
 def guess_coordinate_names(da: xarray.DataArray) -> \
         tuple[typing.Optional[str],typing.Optional[str],typing.Optional[str],typing.Optional[str]]:
     possible_lon_names = ['longitude', 'lon', 'x', 'long']
@@ -29,14 +46,23 @@ def is_lon_lat(da: xarray.DataArray):
     return ok
 
 
-def conservative_regrid(source: xarray.Dataset,
+def conservative_regrid(source: typing.Union[xarray.Dataset,xarray.DataArray],
                         target: xarray.DataArray
                         ) -> xarray.Dataset:
     logger.info("Running conservative regridding...")
     # 1 -- check all are long/lat fields.
-    for var_name, var_data in source.data_vars.items():
-        if not is_lon_lat(var_data):
-            raise ValueError(f'{var_name} not long/lat field.. ')
+    if isinstance(source,xarray.Dataset):
+        for var_name, var_data in source.data_vars.items():
+            if not is_lon_lat(var_data):
+                raise ValueError(f'{var_name} not long/lat field.. ')
+    elif isinstance(source,xarray.DataArray):
+         if not is_lon_lat(source):
+            raise ValueError(f'{source.name} not long/lat field.. ')
+    else:
+        pass
+             
+
+
 
     regridded = source.regrid.conservative(target)  # and regrid using xarray-regrid.
 

@@ -61,6 +61,8 @@ def fix_units(da: xarray.DataArray) -> xarray.DataArray:
     # Example: Convert units to a standard format if needed
     unit = da.attrs.get('units')
     lon,lat,vert,time = UKESMlib.guess_coordinate_names(da)
+    # and standardise units
+    da = da.rename({lon:'longitude',lat:'latitude',time:'time'})
     if unit is None:
         return  da # nothing to do as have no units.
     with xarray.set_options(keep_attrs=True):
@@ -74,7 +76,7 @@ def fix_units(da: xarray.DataArray) -> xarray.DataArray:
             result.attrs['units'] = 'kg/sec'  # update units to kg/sec
             my_logger.info("Converting mm/day to kg/sec")
         elif unit == 'mm/month':
-            result = da[time].dt.days_in_month * 24 * 60 * 60  # convert to kg/sec
+            result = da/(da['time'].dt.days_in_month * 24 * 60 * 60)  # convert to kg/sec
             result.attrs['units'] = 'kg/sec'  # update units to kg/sec
             result.attrs['units'] = 'kg/sec'  # update units to kg/sec
             my_logger.info("Converting mm/month to kg/sec for {da.name}")
@@ -121,15 +123,21 @@ def process_files(input_files: list[str],
 
         if rename_vars is not None:
             my_logger.info(f'Renaming variables: {rename_vars}')
+            # only rename those variables in the data_vars
+            names_got = set(ds.data_vars.keys())
+            names_to_remove = set(rename_vars.keys()) - names_got
+            for name in names_to_remove:
+                rename_vars.pop(name)
             ds = ds.rename(rename_vars)
 
 
         my_logger.info(f'Processing {ds.data_vars.keys()} variables')
-
+        
+        ds = ds.load() # force the load
         with  np.errstate(divide='ignore', invalid='ignore'):
             regridded = conservative_regrid(ds, land_fract )  # regrid to land fraction grid
 
-            regridded = regridded.load() # force the load
+            regridded = regridded
         regridded = regridded.map(fix_units)  # fix units of the regridded data
         logging.info('Regridded data')
         regional_avg = UKESMlib.compute_regional_averages(regridded,  masks)

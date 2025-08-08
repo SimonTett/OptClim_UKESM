@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # process obs data to timeseries.
 export PYTHONUNBUFFERED=1 # no buffering for python.
-data_dir=/gws/nopw/j04/terrafirma/tetts/data/obs_data
+export PYTHONWARNINGS=ignore # turn off a bunch of warnings...
+data_dir=${BASE_DIR}/obs_data
 ts_dir=${data_dir}/ts_data # where the timeseries data is stored.
 if [[ -z ${OPT_UKESM_ROOT} ]]
 then
@@ -9,7 +10,6 @@ then
     exit 1
 fi
 echo "OPT_UKESM_ROOT: ${OPT_UKESM_ROOT}"
-source $OPT_UKESM_ROOT/Opt_UKESM/bin/activate # setup python env. No idea why it needs to be done
 ##sw_dir=~/tetts/OptClim_UKESM/
 ##export PATH=$PATH:${sw_dir}/processing:${sw_dir}/post_process
 # activate the environment before running the script.
@@ -24,7 +24,7 @@ process_modis_aatsr.py ${data_dir}
 convert_BEST.py ${data_dir}/BEST/Complete_TAVG_LatLong1.nc
 
 ## modis cloud
-cmd="${cmd_root} ${ts_dir}/modis_cloud_ts.nc ${data_dir}/modis_cloud_extract/MCD06COSP_M3_MODIS.A*.nc"
+cmd="${cmd_root} ${ts_dir}/modis_cloud_ts.nc ${data_dir}/modis_cloud_extract/*.nc"
 echo "Processing modis cloud with $cmd"
 $($cmd) # modis cloud
 
@@ -80,7 +80,7 @@ rename_ncep2="air:T mslp:MSLP  rhum:RH"
 for f in ${ncep_files}
 do
     out_file="ncep2_$(basename $f .nc)"
-    out_file="${data_dir}/${out_file}_ts.nc"
+    out_file="${ts_dir}/${out_file}_ts.nc"
     echo "$f -> $out_file"
     cmd="${cmd_root} ${out_file} ${f} --rename ${rename_ncep2}"
     echo "Processing ncep2 file ${f} with $cmd"

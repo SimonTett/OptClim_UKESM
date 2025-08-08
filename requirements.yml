@@ -2,8 +2,8 @@ name: Opt_UKESM1
 channels:
   - conda-forge
 dependencies:
-  - python=3.12
+  - python==3.12
   - pip
   - scitools-iris
   - pip: # install what we can with pip
-    - -r requirments.txt
+    - -r requirements.txt
