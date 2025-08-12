@@ -4,6 +4,7 @@ channels:
 dependencies:
   - python==3.12
   - pip
+  - numpy
   - scitools-iris
   - pip: # install what we can with pip
     - -r requirements.txt

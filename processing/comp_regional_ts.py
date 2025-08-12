@@ -17,16 +17,19 @@ import logging
 import pathlib
 from typing import List, Optional, Tuple, Dict, Any
 import numpy as np
+import pandas as pd
 import xarray
 import xarray_regrid # regridding in xarray
-
+import glob
 
 import UKESMlib
 
 
-my_logger = logging.getLogger(__name__)
+my_logger = logging.getLogger('comp_regional_ts')  # create a logger for this module
 
-def conservative_regrid(source: xarray.Dataset, target: xarray.DataArray
+
+def conservative_regrid(source: xarray.Dataset, target: xarray.DataArray,
+                        time_range: Optional[Tuple[pd.Timestamp, pd.Timestamp]] = None
 
                         ) -> xarray.Dataset:
 
@@ -42,6 +45,8 @@ def conservative_regrid(source: xarray.Dataset, target: xarray.DataArray
         if time_name is not None:  # if there is a time dimension
             rename.update({time_name: 'time'})  # rename time coord to 'time'
         da = var_data.rename(rename) # rename the coords to be lon/lat
+
+        # now do the regird
         regridded[var_name] = da.regrid.conservative(target) # and regrid using xarray-regrid.
 
     regridded = xarray.Dataset(regridded)  # convert to a Dataset
@@ -62,7 +67,9 @@ def fix_units(da: xarray.DataArray) -> xarray.DataArray:
     unit = da.attrs.get('units')
     lon,lat,vert,time = UKESMlib.guess_coordinate_names(da)
     # and standardise units
-    da = da.rename({lon:'longitude',lat:'latitude',time:'time'})
+    da = da.rename({lon:'longitude',lat:'latitude'})
+    if time is not None:  # if there is a time dimension
+        da = da.rename({time: 'time'})
     if unit is None:
         return  da # nothing to do as have no units.
     with xarray.set_options(keep_attrs=True):
@@ -98,11 +105,12 @@ def fix_units(da: xarray.DataArray) -> xarray.DataArray:
 
 
 def process_files(input_files: list[str],
-                  land_sea_file: str,
-                  output_file: str,
+                  land_sea_file: pathlib.Path,
+                  output_file: pathlib.Path,
                   critical_value: float = 0.5,
                   variables: Optional[list[str]] = None,
-                  rename_vars: Optional[dict[str,str]] = None) -> None:
+                  rename_vars: Optional[dict[str,str]] = None,
+                  time_range:Optional[tuple[pd.Timestamp,pd.Timestamp]]=None) -> xarray.Dataset:
     my_logger.info("Starting file processing...")
 
     land_fract = xarray.load_dataarray(land_sea_file,decode_times=False).squeeze(drop=True).drop_vars(['surface','t'],errors='ignore')
@@ -119,7 +127,10 @@ def process_files(input_files: list[str],
 
 
         if variables:
-            ds = ds[variables]
+            vars = set(variables) & set(ds.data_vars.keys())  # only keep those variables in the dataset
+            if len(vars) == 0:
+                raise ValueError(f"No variables found in the dataset matching {variables}.")
+            ds = ds[vars]
 
         if rename_vars is not None:
             my_logger.info(f'Renaming variables: {rename_vars}')
@@ -131,13 +142,23 @@ def process_files(input_files: list[str],
             ds = ds.rename(rename_vars)
 
 
-        my_logger.info(f'Processing {ds.data_vars.keys()} variables')
-        
-        ds = ds.load() # force the load
-        with  np.errstate(divide='ignore', invalid='ignore'):
-            regridded = conservative_regrid(ds, land_fract )  # regrid to land fraction grid
 
-            regridded = regridded
+        if time_range is not None:
+            for var_name, var_data in ds.data_vars.items():
+                _,_,_,timec = UKESMlib.guess_coordinate_names(var_data)
+                if timec is not None:
+                    my_logger.info(f'Selecting time range: {time_range} for variable {var_name} using coord {timec}')
+                    ds[var_name] = var_data.sel({timec:slice(*time_range)})
+
+
+        my_logger.info(f'Processing {list(ds.data_vars.keys())} variables')
+        
+        #ds = ds.load() # force the load
+        ds = ds.unify_chunks()
+        with  np.errstate(divide='ignore', invalid='ignore'):
+            regridded = conservative_regrid(ds, land_fract)  # regrid to land fraction grid
+
+            regridded = regridded.load()
         regridded = regridded.map(fix_units)  # fix units of the regridded data
         logging.info('Regridded data')
         regional_avg = UKESMlib.compute_regional_averages(regridded,  masks)
@@ -165,19 +186,20 @@ def process_files(input_files: list[str],
     regional_avg.attrs['description'] = 'Regional average data'
     regional_avg.attrs['script'] = __file__
     regional_avg.attrs['critical_value'] = str(critical_value)
-
+    output_file.parent.mkdir(parents=True, exist_ok=True)  # ensure the output directory exists
     regional_avg.to_netcdf(output_file)
 
     my_logger.info("Processing complete.")
+    return regional_avg
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('input_files', nargs='+')
+    parser.add_argument('input_files', nargs='+',type=str)
     parser.add_argument('--variables', nargs='+',help='Variables to process',
                         default=[])
-    parser.add_argument('--land_sea_file', required=True)
-    parser.add_argument('--output_file', required=True)
+    parser.add_argument('--land_sea_file', required=True,type=pathlib.Path)
+    parser.add_argument('--output_file', required=True,type=pathlib.Path)
     parser.add_argument('--critical_value', type=float, default=0.5,
                          help='Values >= this are land; less than Sea')
     group = parser.add_mutually_exclusive_group()
@@ -185,20 +207,41 @@ def main():
     group.add_argument('--nooverwrite', dest='overwrite', action='store_false', help='Disable overwrite')
     parser.set_defaults(overwrite=False)
     parser.add_argument('--log_level', type=str, default='WARNING', help='Log level of of the script')
-    parser.add_argument('--rename', type=str, nargs='+',default=None,help='Pairs of variable names to rename in the form old_name:new_name, e.g. tas:temperature')
+    parser.add_argument('--rename', type=str, nargs='+',default=None,
+                        help='Pairs of variable names to rename in the form old_name:new_name, e.g. tas:temperature. Variable selection occurs before renaming.')
+    parser.add_argument('--time_range', nargs=2, type=pd.Timestamp, default=None
+                        , help='Time range to use for processing. If not provided, all times will be used.')
     args = parser.parse_args()
+    my_logger = UKESMlib.setup_logging(rootname='comp_regional_ts',level = args.log_level)
+    input_files = []
+    for file in args.input_files:
+        input_files += [f for f in glob.glob(file)]  # expand wildcards
+    # check all input files exist
+    missing_files = False
+    for file in input_files:
+        if not pathlib.Path(file).exists():
+            my_logger.warning(f"Input file {file} does not exist.")
+            missing_files = True
+    if missing_files:
+        raise ValueError("One or more input files do not exist. Please check the input files.")
+
+
 
     # Set up logging
-    logging.basicConfig(level=args.log_level, format='%(asctime)s - %(levelname)s - %(message)s')
 
-    if not args.overwrite and pathlib.Path(args.output_file).exists():
-        raise ValueError(f'File {args.output_file} exists. See --overwrite to overwrite it')
+
+    if (not args.overwrite) and args.output_file.exists():
+        my_logger.warning(f'File {args.output_file} exists. See --overwrite to overwrite it')
+        exit(0)
     rename_vars = args.rename
     if rename_vars is not None:
         rename_vars = dict([p for p in pair.split(':')] for pair in rename_vars)  # convert to dict
 
-    process_files(args.input_files, args.land_sea_file, args.output_file,
-                  critical_value=args.critical_value, variables=args.variables,rename_vars=rename_vars)
+    if not args.land_sea_file.exists():
+        raise ValueError(f"Land/Sea file {args.land_sea_file} does not exist.")
+    process_files(input_files, args.land_sea_file, args.output_file,
+                  critical_value=args.critical_value, variables=args.variables,rename_vars=rename_vars,
+                  time_range =args.time_range)
 
 
 if __name__ == '__main__':

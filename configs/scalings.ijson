@@ -1,0 +1,16 @@
+{
+  "CLDliq_NHX": 100.0,
+  "CLDliq_T": 100.0,
+  "CLDliq_SHX": 100.0,
+  "CLDliq_NHX_L_seas": 100.0,
+  "Reff_NHX": 1000000.0,
+  "Reff_T": 1000000.0,
+  "Reff_SHX": 1000000.0,
+  "Reff_NHX_L_seas": 1000000.0,
+  "Precip_NHX_L": 86400,
+  "Precip_T_L": 86400,
+  "Precip_NHX_L_seas": 86400,
+  "MSLP_NHX_DGM": 0.01,
+  "MSLP_T_DGM": 0.01,
+  "MSLP_NHX_DGM_seas": 0.01
+}

@@ -194,7 +194,7 @@ def total_column(data: typing.Optional[xarray.DataArray],
                  scale: typing.Optional[float] = None) -> xarray.DataArray:
     """
     Compute total column of substance (kg/m^2) assuming hydrostatic atmosphere.
-        (Atmospheric mass in layer is \Delta P/g)
+        (Atmospheric mass in layer is dP/g)
     :param data: dataArray of the variable for which column calculation is being done. (or None)
         Assumed to be a mass mixing ratio (kg/kg)
     :param atmos_mass: total mass/m^2 of atmosphere.
@@ -251,6 +251,7 @@ def modis_reff(dataset):
         logging.warning("Failed to find reffwt or wt")
         return None
     result = reffwt.where(wt > 1e-5) / wt  # compute the effective radius
+    result = result.rename('Reff')  # rename the result
     return result
 
 def modis_reff_ice(dataset):
@@ -260,6 +261,7 @@ def modis_reff_ice(dataset):
         logging.warning("Failed to find reffwt or wt")
         return None
     result = reffwt.where(wt > 1e-5) / wt  # compute the effective radius
+    result = result.rename('ReffIce')  # rename the result
     return result
 
 def modis_cld_total(dataset):
@@ -274,6 +276,7 @@ def modis_cld_total(dataset):
         logging.warning("Failed to find MODIS cloud fraction or wt")
         return None
     result = cld_frac.where(wt > 1e-5) / wt  # compute the total cloud fraction
+    result = result.rename('CLDtot')  # rename the result
     return result
 
 def modis_cld_liquid(dataset):
@@ -288,7 +291,10 @@ def modis_cld_liquid(dataset):
         logging.warning("Failed to find MODIS liquid cloud fraction or wt")
         return None
     result = cld_frac.where(wt > 1e-5) / wt  # compute the total cloud fraction
+    result = result.rename('CLDliq')  # rename the result
     return result
+
+
 
 def modis_cld_ice(dataset):
     """
@@ -302,20 +308,7 @@ def modis_cld_ice(dataset):
         logging.warning("Failed to find MODIS ice cloud fraction or wt")
         return None
     result = cld_frac.where(wt > 1e-5) / wt  # compute the total cloud fraction
-    return result
-
-def modis_cld_ice(dataset):
-    """
-    Compute the ice cloud fraction from MODIS data.
-    :param dataset: xarray dataset containing MODIS data
-    :return: total ice cloud fraction as a DataArray
-    """
-    cld_frac = dataset.get('m01s02i453')  # COSP MODIS ice cloud fraction
-    wt = dataset.get('m01s02i330')  # COSP MODIS weight
-    if cld_frac is None or wt is None:
-        logging.warning("Failed to find MODIS ice cloud fraction or wt")
-        return None
-    result = cld_frac.where(wt > 1e-5) / wt  # compute the total cloud fraction
+    result = result.rename('CLDice')  # rename the result
     return result
 
 def modis_cld_top_pressure(dataset):
@@ -330,11 +323,51 @@ def modis_cld_top_pressure(dataset):
         logging.warning("Failed to find MODIS ctp or wt")
         return None
     result = ctp.where(wt > 1e-5) / wt  # compute the total cloud fraction
+    result = result.rename('CTP')  # rename the result
+    return result
+pseudolev_550nm = 3 # pseudolevel for 550 nm in UKESM1.1
+def AOD(dataset:xarray.Dataset) -> typing.Optional[xarray.DataArray]:
+    """
+    Compute the Aerosol Optical Depth (AOD). Uses the following stash codes (and names):
+    2240 -- Aitkin (soluble) abs optical depth
+    2241 -- Accumulation (soluble) abs optical depth
+    2242 -- Coarse (soluble) abs optical depth
+    2243 -- Aitkin (insoluble) abs optical depth
+
+    :param dataset: dataset containing the data
+    :return: AOD as a DataArray or None if any of the components are not found.
+    """
+    ##2585 -- Mineral dust optical depth in radiation scheme
+    items = ['240', '241', '242', '243']  # stash item codes for AOD
+    result = 0.0 # initialise result
+    missing = []
+    for item in items:
+        da = dataset.get(f'm01s02i{item:03d}').sel(pseudolevel=pseudolev_550nm)  # get the dataArray for the item. pseudolevel 3 = 550 nm
+        if da is None:  # if not found then skip
+            missing += [missing]  # add to missing list
+        else:
+            result += da  # add to result
+    if len(missing) > 0:  # if any missing then return None
+        logging.warning(f"Failed to find AOD components {missing}")
+        return None
+    result = result.rename('AOD')  # rename the result
     return result
 
+def mineral_dust_AOD(dataset:xarray.Dataset) -> typing.Optional[xarray.DataArray]:
+    """
+    Compute the mineral dust AOD. Uses the following stash code (and name):
+    2585 -- Mineral dust optical depth in radiation scheme
+    :param dataset: dataset containing the data
+    :return: Mineral dust AOD as a DataArray or None if not found.
+    """
+    da = dataset.get('m01s02i585').sel(pseudolevel=pseudolev_550nm)  # get the dataArray for mineral dust AOD
+    if da is None:  # if not found then return None
+        logging.warning("Failed to find mineral dust AOD")
+        return None
+    return da.rename('mineral_dust_AOD')  # rename and return
 
 
-def genProcess(dataset:xarray.Dataset, land_mask:xarray.Dataset) -> typing.Dict[str,xarray.DataArray]:
+def genProcess(dataset:xarray.Dataset) -> typing.Dict[str,xarray.DataArray]:
     """
     Setup the processing information
     :param dataset: the dataset containing the data
@@ -424,19 +457,23 @@ def genProcess(dataset:xarray.Dataset, land_mask:xarray.Dataset) -> typing.Dict[
         'Precip': dataset[lookup_std['precipitation_flux']].sel({latitude_coord: constrain_60S}),
         'MSLP': dataset[lookup_std['air_pressure_at_sea_level']],
         'Reff': modis_reff(dataset),
-        'Reff_ice': modis_reff_ice(dataset),
-        'cld_total': modis_cld_total(dataset),
-        'cld_liquid': modis_cld_liquid(dataset),
-        'cld_ice': modis_cld_ice(dataset),
-        'cld_top_pressure': modis_cld_top_pressure(dataset),
-        # SO2 related. Except SO2_col the rest are for HadXM3 and will need updating.
+        'ReffIce': modis_reff_ice(dataset),
+        'CLDtot': modis_cld_total(dataset),
+        'CLDliq': modis_cld_liquid(dataset),
+        'CLDice': modis_cld_ice(dataset),
+        'CTP': modis_cld_top_pressure(dataset),
+        'AOD': AOD(dataset),
+        'mineral_dust_AOD': mineral_dust_AOD(dataset),
+        # SO2 related.
         'SO2_col': total_column(name_fn('mass_fraction_of_sulfur_dioxide_in_air', dataset, name_type='name'),
                                 mass),
-        'dis_col': total_column(name_fn("SO4 DISSOLVED AEROSOL AFTER TSTEP", dataset, name_type='long'), mass),
-        'aitkin_col': total_column(name_fn('SO4 AITKEN MODE AEROSOL AFTER TSTEP', dataset, name_type='long'), mass),
-        'accum_col': total_column(name_fn('SO4 ACCUM. MODE AEROSOL AFTER TSTEP', dataset, name_type='long'), mass),
-        'DMS_col': total_column(name_fn('mass_fraction_of_dimethyl_sulfide_in_air', dataset, name_type='name'),
-                                mass),
+        # UM/UKCA does have total column diagnostics for H2SO4 but they are not in the UKESM1.1 diagnostics.
+        'h2so4_col': total_column(dataset[lookup_stash['m01s34i073']], mass), # alt try 38520
+        'nucleation_h2so4_col': total_column(dataset[lookup_stash['m01s34i102']], mass), # alt try 38485
+        'aitkin_h2so4_col': total_column(dataset[lookup_stash['m01s34i104']], mass), # alt try  38486
+        'accum_h2so4_col': total_column(dataset[lookup_stash['m01s34i108']], mass), # alt try 38487
+        'coarse_h2so4_col': total_column(dataset[lookup_stash['m01s34i114']], mass), # alt try 38488
+        'DMS_col': total_column(dataset[lookup_stash['m01s34i071']], mass),
         'Trop_SW_up': name_fn('tropopause_upwelling_shortwave_flux', dataset),
         'Trop_SW_net': name_fn('tropopause_net_downward_shortwave_flux', dataset),
         'Trop_LW_up': name_fn('tropopause_upwelling_longwave_flux', dataset),
@@ -453,8 +490,8 @@ def genProcess(dataset:xarray.Dataset, land_mask:xarray.Dataset) -> typing.Dict[
         if temp is not None:
             temp /= p_wt # scale by time above sfc.
             process.update(
-                {'TEMP@50': temp.sel(coord_50hPa),
-                 'TEMP@500': temp.sel(coord_500hPa)})
+                {'T@50': temp.sel(coord_50hPa),
+                 'T@500': temp.sel(coord_500hPa)})
 
         # compute RH
         rh = name_fn('m01s30i206', dataset, name_type='stash')
@@ -463,7 +500,7 @@ def genProcess(dataset:xarray.Dataset, land_mask:xarray.Dataset) -> typing.Dict[
             process.update(
                 {'RH@500': rh.sel(coord_500hPa),
                  'RH@50': rh.sel(coord_50hPa), })
-    # deal with SO2
+
 
 
     process['netflux'] = process['INSW'] - process['RSR'] - process['OLR']
@@ -523,8 +560,9 @@ def compute_values(files: typing.Iterable[pathlib.Path],
     dataset = read_UMfiles(files)
     dataset = dataset.sel(time=slice(start_time, end_time))
 #    land_mask = dataset.land_area_fraction.isel(time=0).squeeze()  # land/sea mask
-    land_mask = xarray.where(land_mask > land_mask_fraction, True, False)
-    process = genProcess(dataset, land_mask)
+
+    masks = UKESMlib.create_region_masks(land_mask,critical_value=land_mask_fraction)
+    process = genProcess(dataset)
 
     # now to process all the data making output.
     results = dict()
@@ -532,9 +570,11 @@ def compute_values(files: typing.Iterable[pathlib.Path],
         if dataArray is None:  # no dataarray for this name
             logging.warning(f"{name} is None. Not processing")
             continue
-        mean = means(dataArray, name)  # compute the means
-        results.update(mean)  # and stuff them into the results dict.
-        logging.debug(f"Processed {name} and got {mean}")
+        ## TODO -- use UKESM1 means (and mask generation)
+        regrid = UKESMlib.conservative_regrid(dataArray,land_mask)
+        means = UKESMlib.compute_regional_averages(regrid, masks)
+        results.update(means)  # and stuff them into the results dict.
+        logging.debug(f"Processed {name} and got {means}")
 
 
     # now to write the data
@@ -585,7 +625,7 @@ def do_work():
       Northern Hemisphere Extra-tropical and Tropical Mean Sea Level Pressure difference from global average
     """
                                      )
-    parser.add_argument("CONFIG", help="The Name of the Config file")
+    parser.add_argument("CONFIG", help="The Name of the Config file",type=pathlib.Path)
     parser.add_argument("-d", "--dir", help="The Name of the input directory")
     parser.add_argument("OUTPUT", nargs='?', default=None,
                         help="The name of the output file. Will override what is in the config file")
@@ -593,9 +633,8 @@ def do_work():
     parser.add_argument("-v", "--verbose", help="Provide verbose output", action="count", default=0)
     args = parser.parse_args()  # and parse the arguments
     # setup processing
-
-    config = StudyConfig.readConfig(expand(args.CONFIG))
-    options = config.getv('postProcess', {})
+    with args.CONFIG.open('rt') as fp:
+        options = json.load(fp)  # load the options from the config file
 
     # work out the files if needed
     if args.dir is None:
@@ -624,7 +663,7 @@ def do_work():
         clean_files += extra_files
 
     if args.OUTPUT is None:
-        output_file = options['outputPath']  # better be defined so throw error if not
+        output_file = options['output_file']  # better be defined so throw error if not
     else:
         output_file = args.OUTPUT
 

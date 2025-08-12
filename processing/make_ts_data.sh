@@ -16,6 +16,8 @@ echo "OPT_UKESM_ROOT: ${OPT_UKESM_ROOT}"
 echo  $VIRTUAL_ENV
 mkdir -p $ts_dir
 
+sat_cld_vars="Cloud_Particle_Size_Liquid Cloud_Retrieval_Fraction_Liquid Cloud_Top_Pressure"
+sat_rename="Cloud_Particle_Size_Liquid:Reff Cloud_Retrieval_Fraction_Liquid:CLDliq Cloud_Top_Pressure:CTP"
 cmd_root="comp_regional_ts.py  --land_sea_file ${OPT_UKESM_ROOT}/post_process/land_frac.nc --nooverwrite --output_file "
 
 # run process_modis_aatsr.py to process the modis and aatsr data.
@@ -24,12 +26,12 @@ process_modis_aatsr.py ${data_dir}
 convert_BEST.py ${data_dir}/BEST/Complete_TAVG_LatLong1.nc
 
 ## modis cloud
-cmd="${cmd_root} ${ts_dir}/modis_cloud_ts.nc ${data_dir}/modis_cloud_extract/*.nc"
+cmd="${cmd_root} ${ts_dir}/modis_cloud_ts.nc ${data_dir}/modis_cloud_extract/*.nc --variables ${sat_cld_vars} --rename ${sat_rename}"
 echo "Processing modis cloud with $cmd"
 $($cmd) # modis cloud
 
 # AATRSR cloud
-cmd="${cmd_root} ${ts_dir}/aatsr_cloud_ts.nc ${data_dir}/AATSR_cloud_extract/*.nc"
+cmd="${cmd_root} ${ts_dir}/aatsr_cloud_ts.nc ${data_dir}/AATSR_cloud_extract/*.nc --variables ${sat_cld_vars} --rename ${sat_rename}"
 echo "Processing AATSR cloud data with $cmd"
 $($cmd) # run it.
 
@@ -39,7 +41,7 @@ echo "Processing CRUTS tmn with $cmd"
 $($cmd) # CRU_TS
 
 # CRU_TS precip
-cmd="${cmd_root} ${ts_dir}/CRU_TS_pre_ts.nc ${data_dir}/CRU_TS/cru_ts4.09.2*.pre.dat.nc --variables pre --rename pre:Precip"
+cmd="${cmd_root} ${ts_dir}/CRU_TS_pre_ts.nc ${data_dir}/CRU_TS/cru_ts4.09.2*.pre.dat.nc --variables pre --rename Precipitation:Precip"
 echo "Processing CRUTS pre with $cmd"
 $($cmd) # CRU_TS
 
@@ -50,25 +52,26 @@ echo "Processing CRUTS pre with $cmd"
 $($cmd) # CRU_TS
 
 # BEST temp
-cmd="${cmd_root} ${ts_dir}/BEST_ts.nc ${data_dir}/BEST/Complete_TAVG_LatLong1_processed.nc --rename absolute_temperature:T2m" # compatibility with CRU_TS data/
+cmd="${cmd_root} ${ts_dir}/BEST_ts.nc ${data_dir}/BEST/Complete_TAVG_LatLong1_processed.nc --variables absolute_temperature--rename absolute_temperature:T2m" # compatibility with CRU_TS data/
 echo "Processing BEST with $cmd"
 $($cmd) # BEST
 
 # CERES
-cmd="${cmd_root} ${ts_dir}/ceres_ts.nc ${data_dir}/ceres/CERES_EBAF-TOA_Ed4.2.1_Subset_200003-202504.nc"
+CERES_RENAME="toa_lw:ORL toa_sw:RSR toa_net:netflux solar_monm:INSW toa_sw_clr_c_mon:RSRC toa_lw_clr_c_mon:OLRC"
+cmd="${cmd_root} ${ts_dir}/ceres_ts.nc ${data_dir}/ceres/CERES_EBAF-TOA_Ed4.2.1_Subset_200003-202504.nc --rename ${CERES_RENAME}"
 echo "Processing CERES with $cmd"
 $($cmd) # CERES
 
 
 # ERA5
-rename_era="t2m:T2m r:T tp:Precip msl:MSLP  r:RH"
+rename_era="t2m:T2m t:T tp:Precip msl:MSLP  r:RH"
 era5_files=$(ls -1  ${data_dir}/ERA5/*.nc)
 for f in ${era5_files}
 do
     out_file="$(basename $f .nc)"
     out_file="${ts_dir}/${out_file}_ts.nc"
     echo "$f -> $out_file"
-    cmd="${cmd_root} ${out_file} ${f}"
+    cmd="${cmd_root} ${out_file} ${f} --rename ${rename_era}"
     echo "Processing ERA5 file ${f} with $cmd"
     $($cmd) # ERA-5
 done
