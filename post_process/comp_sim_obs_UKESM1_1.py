@@ -20,7 +20,6 @@ import xarray
 import iris
 import logging
 import sys
-import StudyConfig
 import UKESMlib
 
 _name_pat = None
