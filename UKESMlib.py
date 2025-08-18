@@ -10,16 +10,21 @@ import sys
 import subprocess
 import pandas as pd
 import iris
+import re
 my_logger = logging.getLogger('UKESM')
 
 ## work out base-dirs for data depening on machine
 host = socket.gethostname()
+on_jasmin =re.match('sci-vm-0\d.jasmin.ac.uk',host)
 try:
     base_dir = pathlib.Path(os.getenv('BASE_DIR'))
 except TypeError as e: # failed coz BASE_DIR does not exist
     my_logger.warning('BASE_DIR not in env')
     if host.startswith('GEOS-W'):  # Geos windows desktop
         base_dir = pathlib.Path(r"P:\optclim_data")
+    elif on_jasmin:
+        base_dir=pathlib.Path('gws/nopw/j04/terrafirma/tetts/data')
+
     else:
         raise ValueError('Do not know how to define base_dir.  Define BASE_DIR or modify code')
 
@@ -29,6 +34,8 @@ except TypeError as e:  # failed coz PROCESS_DIR does not exist
     my_logger.warning('PROCESS_DIR not in env')
     if host.startswith('GEOS-W') or host.startswith('GEOS_L'):  # Geos windows dekstop or laptop
         process_dir = pathlib.Path(r"C:\Users\stett2\OneDrive - University of Edinburgh\data\Opt_UKESM1")
+    elif on_jasmin:
+        process_dir = base_dir/'processing'
     else:
         raise ValueError('Do not know how to define process_dir.  Define PROCESS_DIR or modify code')
 

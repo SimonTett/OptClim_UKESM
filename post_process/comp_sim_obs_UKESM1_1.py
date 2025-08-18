@@ -6,7 +6,7 @@ Compute simulated observables using iris (to read in pp datata) and xarray
  =to process. 
 Observations generated are in genProcess (or help for script)
 
-Provide two pathways for date retrieval
+Provides two pathways for date retrieval
 1) If input PP data then read each file converting to netcdf. If netcdf already exists then warn and skip read. 
 2) If netcdf file(s) open with xarray.open_mfdataset and work with the data.
 
@@ -15,7 +15,7 @@ For processing provide two pathways
 2) If no time range set then leave data as is.
 
 For output provide two pathways
-1) Writing to json -- convert to pandas series with names varname_region. If have time dimension Fail
+1) Writing to json -- convert to pandas series
 2) Writing to netcdf -- write out! 
 
  """
@@ -39,7 +39,8 @@ import warnings # so we can supress iris warnings...
 
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
-
+warnings.filterwarnings('ignore', category=RuntimeWarning,
+                        message='invalid value encountered in divide')
 # liust of wanted stash
 wanted_stash=set([
                   'm01s02i330', # COSP weighting
@@ -247,8 +248,7 @@ def total_column(data: typing.Optional[xarray.DataArray],
                  atmos_mass: typing.Optional[xarray.DataArray],
                  scale: typing.Optional[float] = None) -> xarray.DataArray:
     """
-    Compute total column of substance (kg/m^2) assuming hydrostatic atmosphere.
-        (Atmospheric mass in layer is dP/g)
+    Compute total column of substance (kg/m^2) 
     :param data: dataArray of the variable for which column calculation is being done. (or None)
         Assumed to be a mass mixing ratio (kg/kg)
     :param atmos_mass: total mass/m^2 of atmosphere.
@@ -263,7 +263,7 @@ def total_column(data: typing.Optional[xarray.DataArray],
         return None
     col = (data * atmos_mass).sum(vertical_coord)  # work out column  by integrating and multiply by atmos/m^2
     col = col.rename('Column '+data.name )
-    # FIXME getting -ve values sometimes
+    
     if scale is not None:
         col *= scale
 
@@ -400,13 +400,16 @@ def genProcess(dataset:xarray.Dataset,
         
 
 
-    def AOD(dataset:xarray.Dataset) -> typing.Optional[xarray.DataArray]:
+    def AOD(dataset:xarray.Dataset,
+            *args,
+            **kwargs) -> typing.Optional[xarray.DataArray]:
         """
         Compute the Aerosol Optical Depth (AOD) at 550 nm. Uses the following stash codes (and names):
-        2240 -- Aitkin (soluble) abs optical depth
-        2241 -- Accumulation (soluble) abs optical depth
-        2242 -- Coarse (soluble) abs optical depth
-        2243 -- Aitkin (insoluble) abs optical depth
+        2285 -- dust (from CLASSIC(?) scheme)
+        2300 -- Aitkin (soluble) AOD
+        2301 -- Accumulation (soluble) abs optical depth
+        2302 -- Coarse (soluble) abs optical depth
+        2303 -- Aitkin (insoluble) abs optical depth
         
         :param dataset: dataset containing the data
         :return: AOD as a DataArray or None if any of the components are not found.
@@ -419,7 +422,7 @@ def genProcess(dataset:xarray.Dataset,
         missing = []
         for item in items:
             stash = f'm01s02i{item:03d}'
-            da = name_fn(stash,dataset,name_type='stash')
+            da = name_fn(stash,dataset,name_type='stash',*args,**kwargs)
             if da is None:  # if not found then skip
                 missing += [stash]  # add to missing list
             else:
@@ -430,29 +433,45 @@ def genProcess(dataset:xarray.Dataset,
         result = result.rename('AOD')  # rename the result
         return result
 
+    def cell_area(da):
+        # compute area on m^2 useing haversine formulae
+        # Earth's radius in meters
+        R = 6371e3
+        # Convert degrees to radians
+        lats_rad = np.deg2rad(da['latitude'])
+        lons_rad = np.deg2rad(da['longitude'])
+        # Calculate spacing
+        dlat = np.abs(np.diff(lats_rad).mean())
+        dlon = np.abs(np.diff(lons_rad).mean())
+        # Area formula for each latitude band
+        area = (R**2) * dlon * (np.sin(lats_rad + dlat/2) - np.sin(lats_rad - dlat/2))
+             
+        return area  # 1D array: area for each latitude band
+
 
 
     lon,latitude_coord, vert,tc = UKESMlib.guess_coordinate_names(dataset[lookup_stash['m01s03i236']])  # 1.5 m air tempo.
     constrain_60S = dataset[latitude_coord] >= -60.
     # need to extract the actual values...
     constrain_60S = constrain_60S[latitude_coord][constrain_60S]
+    
     # set up the data to be meaned. Because of xarray's use of dask no processed  happens till
     # spatial (And temporal ) means computed. See means.
     mass = name_fn('m01s50i063', dataset, name_type='stash')
-    #mass = name_fn('m01s30i115', dataset, name_type='stash')
     if mass is not None: # convert to mass/m^2
-        lat, lon, vertical_coord,_ = UKESMlib.guess_coordinate_names(mass)
-        area = np.cos(np.deg2rad(mass[lat])) * 6371e3  # simple cos lat weighting.
+        area = cell_area(mass)
         mass /= area # convert to per m^2
-
+    AOD_range = slice(-55,55) # want between +/- 55). Hopefully enough sunshine there
+    land_range = slice(-60,None) 
     process = {
         'OLR': name_fn('toa_outgoing_longwave_flux', dataset, name_type='standard'),
         'OLRC': name_fn('toa_outgoing_longwave_flux_assuming_clear_sky', dataset, name_type='standard'),
         'RSR': name_fn('toa_outgoing_shortwave_flux', dataset, name_type='standard'),
         'RSRC': name_fn('toa_outgoing_shortwave_flux_assuming_clear_sky', dataset, name_type='standard'),
         'INSW': name_fn('toa_incoming_shortwave_flux', dataset, name_type='standard'),
-        'T2m':name_fn('m01s03i236',dataset,name_type='stash',**{latitude_coord: constrain_60S}),
-        'Precip': name_fn('precipitation_flux',dataset,name_type='standard',**{latitude_coord: constrain_60S}),
+        'T2m':name_fn('m01s03i236',dataset,name_type='stash',latitude=land_range),
+        'Precip': name_fn('precipitation_flux',dataset,name_type='standard',
+                          latitude=land_range),
         'MSLP': name_fn('air_pressure_at_sea_level',dataset,name_type='standard'),
         'Reff': modis_fn('m01s02i463',dataset,'Reff'),
         'ReffIce': modis_fn('m01s02i464',dataset,'ReffIce'),
@@ -460,8 +479,8 @@ def genProcess(dataset:xarray.Dataset,
         'CLDliq': modis_fn('m01s02i452',dataset,'CLDliq'),
         'CLDice': modis_fn('m01s02i453',dataset,'CLDice'),
         'CTP': modis_fn('m01s02i465',dataset,'CTP',scale=1e-2),
-        'AOD_550': AOD(dataset),
-        'Dust_AOD_550': name_fn('m01s02i285',dataset,name_type='stash',pseudo_level=pseudolev_550nm),
+        'AOD_550': AOD(dataset,latitude=AOD_range),
+        'Dust_AOD_550': name_fn('m01s02i285',dataset,name_type='stash',pseudo_level=pseudolev_550nm,latitide=AOD_range),
         # SO2 related.
         'SO2_col': total_column(name_fn('mass_fraction_of_sulfur_dioxide_in_air', dataset, name_type='name'),
                                 mass),
@@ -528,11 +547,18 @@ def compute_values(files: typing.Iterable[pathlib.Path],
     :return: dict of results
     """
     if all([file.suffix == '.pp' for file in files]):
-        my_logger.debug(f'Reading pp data from {len(files)}')
+        my_logger.debug(f'Reading pp data from {len(files)} files')
         dataset = read_UMfiles(files)
     elif all([file.suffix in ['.nc','.hdf'] for file in files]):
         my_logger.info(f'Reading netcdf data from {len(files)} files')
-        dataset = xarray.open_mfdataset(files)
+        dataset=[]
+        for file in sorted(files):
+            dataset.append(xarray.open_dataset(file))
+            my_logger.debug(f"Opened  {file}")
+        dataset = xarray.concat(dataset,dim='time')
+                      
+        my_logger.info(f'Read netcdf data from {len(files)} files')
+
     else:
         raise ValueError(f'Files inconsisent - {files}')
     if time_range is not None:
@@ -632,48 +658,59 @@ def do_work():
       Northern Hemisphere Extra-tropical and Tropical Mean Sea Level Pressure difference from global average
     """
                                      )
+    defaults = dict(dir='share/data/History_Data/',
+                          output_file='observations.json',
+                          clean=False,
+                          verbose=0,
+                          log_level = 'WARNING',
+                          mask_variable='field36',
+                          land_mask_fraction=0.5,
+                          file_pattern = '*a.pm*.pp',
+                          exclude_vars=[],
+                          timeseries=False,
+                          overwrite=True
+                          
+                          )
     parser.add_argument("CONFIG", help="The Name of the Config file",type=pathlib.Path)
     parser.add_argument("-d", "--dir",
-                        help="The Name of the input directory",type=pathlib.Path,
-                        action=StoreWithFlag,default=pathlib.Path('share/data/History_Data/'))
-    parser.add_argument("output_file", nargs='?', type=pathlib.Path,default='observations.json',
-                        help="The name of the output file. Will override what is in the config file",action=StoreWithFlag)
-    parser.add_argument("--clean", help="Clean dumps from directory", action=StoreWithFlag_BooleanOptionalAction,default=False)
-    parser.add_argument("-v", "--verbose", help="Provide verbose output", default=0,action=StoreWithFlag_count)
-    parser.add_argument('--log_level',help='Set logging level',default='WARNING',action=StoreWithFlag)
-    parser.add_argument('--time_range',help='Time range for data extraction',nargs=2,action=StoreWithFlag)
-    parser.add_argument('--mask_file',help='Name of file containing land_mask data',action=StoreWithFlag,type=pathlib.Path)
-    parser.add_argument('--mask_variable',help='Name of land mask variable',action=StoreWithFlag,default='field36')
-    parser.add_argument('--land_mask_fraction',help='Critical value for land',action=StoreWithFlag,default=0.5,type=float)
-    parser.add_argument('--file_pattern',help='File glob pattern to read data from',action=StoreWithFlag,default='*a.pm*.pp')
-    parser.add_argument('--exclude_vars',help='Things not to process',action=StoreWithFlag,default=[],nargs='+')
-    parser.add_argument('--timeseries',help='Have timeseries output',action=StoreWithFlag_BooleanOptionalAction,default=False)
-    parser.add_argument('--overwrite',help='Overwrite',action=StoreWithFlag_BooleanOptionalAction,default=True)
+                        help="The Name of the input directory",type=pathlib.Path)
+    parser.add_argument("output_file",  nargs='?',type=pathlib.Path,
+                        help="The name of the output file.")
+    parser.add_argument("--clean", help="Clean dumps from directory", action=argparse.BooleanOptionalAction)
+    parser.add_argument("-v", "--verbose", help="Provide verbose output", default=0,action='count')
+    parser.add_argument('--log_level',help='Set logging level',default='WARNING')
+    parser.add_argument('--time_range',help='Time range for data extraction',nargs=2)
+    parser.add_argument('--mask_file',help='Name of file containing land_mask data',type=pathlib.Path)
+    parser.add_argument('--mask_variable',help='Name of land mask variable')
+    parser.add_argument('--land_mask_fraction',help='Critical value for land',type=float)
+    parser.add_argument('--file_pattern',help='File glob pattern to read data from')
+    parser.add_argument('--exclude_vars',help='Things not to process',nargs='+')
+    parser.add_argument('--timeseries',help='Have timeseries output',action=argparse.BooleanOptionalAction)
+    parser.add_argument('--overwrite',help='Overwrite',action=argparse.BooleanOptionalAction)
     args = parser.parse_args()  # and parse the arguments
-
+    
     # setup processing
     with args.CONFIG.open('rt') as fp:
-        options = json.load(fp)  # load the options from the config file
+        json_options = json.load(fp)  # load the options from the config file
+
+    options=defaults.copy()
+    options.update({k:v for k,v in json_options.items() if (v is not None and not k.endswith('_comment'))})
+    # update with json values. Ignoring any Nones we get
+    
+    
+    # overwrite the options with arg values if they were set
+    options.update({
+        arg_name:value for   arg_name,value in vars(args).items() if value is not None})
     # set types appropriately -- based on args!
     # Converting everything to the correct type.
     for act in parser._actions: # hack using private part of parser
         if act.type is not None:
             try:
                 options[act.dest]=act.type(options[act.dest])
-                my_logger.debug(f'Converted {act.dest} to {act.type}')
             except KeyError:
                 my_logger.debug(f'Did not find {act.dest} so no type conversion')
 
-    
-    # overwrite the options with arg values if they were set
-    options.update({
-        arg_name:value for   arg_name,value in vars(args).items() if
-        getattr(args,f'_{arg_name}_set',False)})
-    # and update if cmd line is not None and options is None or not set.
-    options.update({
-        arg_name:value for   arg_name,value in vars(args).items() if
-        (options.get(arg_name,None) is None and value is not None and not (arg_name.endswith('_set') or arg_name.endswith('_comment')))})
-    
+
     # set up the logger.
     UKESMlib.setup_logging(options['log_level'])
             
