@@ -3,8 +3,20 @@
 """ 
 
 Compute simulated observables using iris (to read in pp datata) and xarray 
-to process. 
+ =to process. 
 Observations generated are in genProcess (or help for script)
+
+Provide two pathways for date retrieval
+1) If input PP data then read each file converting to netcdf. If netcdf already exists then warn and skip read. 
+2) If netcdf file(s) open with xarray.open_mfdataset and work with the data.
+
+For processing provide two pathways
+1) If time range provided then AFTER processing select within time range and mean in time dropping time dim.
+2) If no time range set then leave data as is.
+
+For output provide two pathways
+1) Writing to json -- convert to pandas series with names varname_region. If have time dimension Fail
+2) Writing to netcdf -- write out! 
 
  """
 
@@ -18,13 +30,42 @@ import typing
 import numpy as np
 import xarray
 import iris
+import iris.fileformats.um as iris_um
 import logging
 import sys
 import UKESMlib
 
+import warnings # so we can supress iris warnings...
+
+
+warnings.simplefilter(action='ignore', category=FutureWarning)
+
+# liust of wanted stash
+wanted_stash=set([
+                  'm01s02i330', # COSP weighting
+                  'm01s02i451','m01s02i452','m01s02i453', # tot cld, liq cld, ice_cld
+                  'm01s02i463', 'm01s02i464', # Reff liq & ice.
+                  'm01s02i465', # CTP
+                  'm01s03i236', # 1.5m temp
+                  'm01s01i207','m01s01i208','m01s01i209', # incoming & outgoing SW  and clear sky outgoing
+                  'm01s02i205', 'm01s02i206', # Outgoing LW all and clear sky
+                  'm01s02i464',
+                  'm01s02i285','m01s02i300','m01s02i301','m01s02i302','m01s02i303' # AOD diagnostics
+                  'm01s05i063',
+                  'm01s50i063', # dry mass of air
+                  'm01s34i073','m01s34i102','m01s34i104','m01s34i108','m01s34i11','m01s34i114', # mmr's
+                  'm01s34i072', # SO2 MMR
+                  'm01s34i071', # DMS
+                  'm01s16i222', # MSLP
+                  'm01s30i204', # T on P levels
+                  'm01s30i206', # RH on P levels
+                  'm01s30i301', # heavyside fn
+                  'm01s05i216', # sfc precip
+              ])
+
 _name_pat = None
 
-
+my_logger=UKESMlib.my_logger
 def new_name(name: str) -> str:
     """
     Generate a new name by incrementing the digits by 1 where name is of form text_N.
@@ -53,6 +94,7 @@ def change_name(var: typing.Union[xarray.DataArray, xarray.Variable], clear: boo
 
     :param var: Xarray Variable or DataArray to see if already have
     :return: name or a new name. Any " " will be converted to _
+    Uniqueness decided by attributes.
     """
     global _named_vars
     if clear:
@@ -63,27 +105,38 @@ def change_name(var: typing.Union[xarray.DataArray, xarray.Variable], clear: boo
     while True:
         value = _named_vars.get(name)
         if value is None:  # not got this value.
-            _named_vars[name] = var  # store the variable
+            _named_vars[name] = var  # store the variable attributes
             return name  # just return the name
-        elif var.equals(value):  # we are the same so safe to reuse. Return name
+        elif var.equals(value):  # Have the same attrs so OK to use.
             return name
         else:  # generate a new name and continue looping
             name = new_name(name)
 
 
+
+    
+    # and to extract the 1h data
+    # cubes_sub=[c for c in cubes if c.cell_methods[0].intervals[0].startswith('1 hour')]
+
 def read_UMfiles(files: typing.Iterable[pathlib.Path]) -> xarray.Dataset:
     """
-    Raad a bunch of UM  files and convert them to  a dataset
+    Read a bunch of UM  pp files and convert them to  a dataset
     :param files: iterable of files to read
     :return: dataset
     """
     data_array_list = []
     if len(files) == 0:
-        logging.warning("File list is empty")
+        my_logger.warning("File list is empty")
         return
-    
-    cubes = iris.load(files)
+    # check they are all .pp files
+        
+    my_logger.info(f'Loading iris cubes from {files}')
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore",category=FutureWarning)
+        cubes = UKESMlib.um_cubes(files,stash_codes=wanted_stash,intervals=[1,6])
+    my_logger.info(f'Loaded {len(cubes)}iris cubes')
     for cube in cubes:
+        my_logger.debug(f'Read cube: {cube.name()}')
         da = xarray.DataArray.from_iris(cube).rename(cube.name())
         try:
             da = da.expand_dims(dim='time')  # attemp to expand time. Will fail if time already exists
@@ -91,6 +144,7 @@ def read_UMfiles(files: typing.Iterable[pathlib.Path]) -> xarray.Dataset:
             pass
         data_array_list.append(da)
     dataSet = merge_dataArray(data_array_list)
+    dataSet.attrs['Conversion'] = 'read_UMfiles'
     return dataSet
 
 
@@ -108,6 +162,7 @@ def merge_dataArray(dataArray_list: list[xarray.DataArray]) -> xarray.Dataset:
         clear = False  # do not clear next time around
         if name != da.name:  # change of name needed?
             da = da.rename(name)  # renaming the dataArray
+            
         for cname in da.coords:  # loop over coords
             var = da[cname]
             var = var.drop_vars(var.coords)  # drop all coords on the co-ord.
@@ -115,11 +170,11 @@ def merge_dataArray(dataArray_list: list[xarray.DataArray]) -> xarray.Dataset:
             if name != cname:  # need to change the name? Update the co-ords
                 rename_dict.update({cname: name})
         if rename_dict: # got sommething to rename?
-            logging.info(f"renaming  using {rename_dict}")  # log!
+            my_logger.info(f"renaming  using {rename_dict}")  # log!
             da = da.rename(rename_dict)
         cleaned.append(da)  # rename
 
-    dataset = xarray.merge(cleaned, compat='identical')
+    dataset = xarray.merge(cleaned, compat='override')
     dataset.attrs = dict(history='merged dataset')
     return dataset
 
@@ -202,8 +257,13 @@ def total_column(data: typing.Optional[xarray.DataArray],
     """
     if data is None or atmos_mass is None:
         return None
-    lat, lon, vertical_coord,_ = UKESMlib.guess_coordinate_names(data)
-    col = (data * atmos_mass).sum(vertical_coord)  # work out column  by integrating and dividing by area.
+    lon, lat, vertical_coord,_ = UKESMlib.guess_coordinate_names(data)
+    if vertical_coord is None:
+        my_logger.warning(f'Failed to find vertical coord in {da.dims}')
+        return None
+    col = (data * atmos_mass).sum(vertical_coord)  # work out column  by integrating and multiply by atmos/m^2
+    col = col.rename('Column '+data.name )
+    # FIXME getting -ve values sometimes
     if scale is not None:
         col *= scale
 
@@ -226,9 +286,13 @@ def names(dataset:xarray.Dataset, name=None):
     elif name == 'long':
         key = 'long_name'
     elif name == 'stash':
-        key = 'STASH'
+        # key depends on how it was converted.
+        if dataset.attrs.get('Conversion','') == 'read_UMfiles':
+            key = 'STASH'
+        else:
+            key='um_stash_source'
     else:
-        raise Exception(f"Do not know what to do with {name}")
+        raise ValueError(f"Do not know what to do with {name}")
 
     lookup = {}
     for var in dataset.variables:
@@ -243,140 +307,20 @@ def names(dataset:xarray.Dataset, name=None):
     return lookup
 
 
-def modis_reff(dataset):
-    reffwt = dataset.get('m01s02i463')  # COSP MODIS weighted liquid Reff
-    wt = dataset.get('m01s02i330')  # COSP MODIS weight
-    if (reffwt is None) or (wt is None):
-        logging.warning("Failed to find reffwt or wt")
-        return None
-    result = reffwt.where(wt > 1e-5) / wt  # compute the effective radius
-    result = result.rename('Reff')  # rename the result
-    return result
-
-def modis_reff_ice(dataset):
-    reffwt = dataset.get('m01s02i464')  # COSP MODIS weighted ice  Reff
-    wt = dataset.get('m01s02i330')  # COSP MODIS weight
-    if (reffwt is None) or (wt is None):
-        logging.warning("Failed to find reffwt or wt")
-        return None
-    result = reffwt.where(wt > 1e-5) / wt  # compute the effective radius
-    result = result.rename('ReffIce')  # rename the result
-    return result
-
-def modis_cld_total(dataset):
-    """
-    Compute the total cloud fraction from MODIS data.
-    :param dataset: xarray dataset containing MODIS data
-    :return: total cloud fraction as a DataArray
-    """
-    cld_frac = dataset.get('m01s02i451')  # COSP MODIS cloud fraction
-    wt = dataset.get('m01s02i330')  # COSP MODIS weight
-    if cld_frac is None or wt is None:
-        logging.warning("Failed to find MODIS cloud fraction or wt")
-        return None
-    result = cld_frac.where(wt > 1e-5) / wt  # compute the total cloud fraction
-    result = result.rename('CLDtot')  # rename the result
-    return result
-
-def modis_cld_liquid(dataset):
-    """
-    Compute the total cloud fraction from MODIS data.
-    :param dataset: xarray dataset containing MODIS data
-    :return: total cloud fraction as a DataArray
-    """
-    cld_frac = dataset.get('m01s02i452')  # COSP MODIS liquid cloud fraction
-    wt = dataset.get('m01s02i330')  # COSP MODIS weight
-    if cld_frac is None or wt is None:
-        logging.warning("Failed to find MODIS liquid cloud fraction or wt")
-        return None
-    result = cld_frac.where(wt > 1e-5) / wt  # compute the total cloud fraction
-    result = result.rename('CLDliq')  # rename the result
-    return result
 
 
-
-def modis_cld_ice(dataset):
-    """
-    Compute the ice cloud fraction from MODIS data.
-    :param dataset: xarray dataset containing MODIS data
-    :return: total ice cloud fraction as a DataArray
-    """
-    cld_frac = dataset.get('m01s02i453')  # COSP MODIS ice cloud fraction
-    wt = dataset.get('m01s02i330')  # COSP MODIS weight
-    if cld_frac is None or wt is None:
-        logging.warning("Failed to find MODIS ice cloud fraction or wt")
-        return None
-    result = cld_frac.where(wt > 1e-5) / wt  # compute the total cloud fraction
-    result = result.rename('CLDice')  # rename the result
-    return result
-
-def modis_cld_top_pressure(dataset):
-    """
-    Compute the cloud top pressure from MODIS data.
-    :param dataset: xarray dataset containing MODIS data
-    :return: CTP as a DataArray
-    """
-    ctp = dataset.get('m01s02i465')  # COSP MODIS ctp
-    wt = dataset.get('m01s02i330')  # COSP MODIS weight
-    if ctp is None or wt is None:
-        logging.warning("Failed to find MODIS ctp or wt")
-        return None
-    result = ctp.where(wt > 1e-5) / wt  # compute the total cloud fraction
-    result = result.rename('CTP')  # rename the result
-    return result
-pseudolev_550nm = 3 # pseudolevel for 550 nm in UKESM1.1
-def AOD(dataset:xarray.Dataset) -> typing.Optional[xarray.DataArray]:
-    """
-    Compute the Aerosol Optical Depth (AOD). Uses the following stash codes (and names):
-    2240 -- Aitkin (soluble) abs optical depth
-    2241 -- Accumulation (soluble) abs optical depth
-    2242 -- Coarse (soluble) abs optical depth
-    2243 -- Aitkin (insoluble) abs optical depth
-
-    :param dataset: dataset containing the data
-    :return: AOD as a DataArray or None if any of the components are not found.
-    """
-    ##2585 -- Mineral dust optical depth in radiation scheme
-    items = ['240', '241', '242', '243']  # stash item codes for AOD
-    result = 0.0 # initialise result
-    missing = []
-    for item in items:
-        da = dataset.get(f'm01s02i{item:03d}').sel(pseudolevel=pseudolev_550nm)  # get the dataArray for the item. pseudolevel 3 = 550 nm
-        if da is None:  # if not found then skip
-            missing += [missing]  # add to missing list
-        else:
-            result += da  # add to result
-    if len(missing) > 0:  # if any missing then return None
-        logging.warning(f"Failed to find AOD components {missing}")
-        return None
-    result = result.rename('AOD')  # rename the result
-    return result
-
-def mineral_dust_AOD(dataset:xarray.Dataset) -> typing.Optional[xarray.DataArray]:
-    """
-    Compute the mineral dust AOD. Uses the following stash code (and name):
-    2585 -- Mineral dust optical depth in radiation scheme
-    :param dataset: dataset containing the data
-    :return: Mineral dust AOD as a DataArray or None if not found.
-    """
-    da = dataset.get('m01s02i585').sel(pseudolevel=pseudolev_550nm)  # get the dataArray for mineral dust AOD
-    if da is None:  # if not found then return None
-        logging.warning("Failed to find mineral dust AOD")
-        return None
-    return da.rename('mineral_dust_AOD')  # rename and return
-
-
-def genProcess(dataset:xarray.Dataset) -> typing.Dict[str,xarray.DataArray]:
+def genProcess(dataset:xarray.Dataset,
+               exclude_vars:typing.Optional[list[str]]=None) -> typing.Dict[str,xarray.DataArray]:
     """
     Setup the processing information
     :param dataset: the dataset containing the data
-    :param land_mask -- land mask as a dateArray.
     :return: dict containing data to be processed.
     """
     # create long & standard name lookup
     lookup_std = names(dataset)
     lookup_long = names(dataset, name='long')
     lookup_stash = names(dataset, name='stash')
+    pseudolev_550nm = 3 # pseudolevel for 550 nm in UKESM1.1
 
     def name_fn(name: typing.Union[str, list[str]],
                 dataset: xarray.Dataset,
@@ -423,24 +367,79 @@ def genProcess(dataset:xarray.Dataset) -> typing.Dict[str,xarray.DataArray]:
             raise ValueError(f"Do not know what to do with name_type {name_type}")
 
         if var is None:  # failed to find name so return None
-            logging.warning(f"Failed to find name {name} of type {name_type}")
+            my_logger.warning(f"Failed to find name {name} of type {name_type}")
             return None
         da = dataset[var]
         if (len(args) > 0) or (len(kwargs) > 0):
             try:
                 da = da.sel(*args, **kwargs)
+
             except KeyError:  # failed to find some co-ords
-                logging.warning(f"Failed to select {var} using {args} or {kwargs}")
+                my_logger.warning(f"Failed to select {var} using {args} or {kwargs}")
                 return None
         return da
 
-    latitude_coord, lon, vert,tc = UKESMlib.guess_coordinate_names(dataset[lookup_stash['m01s03i236']])  # 1.5 m air tempo.
+    def modis_fn(stash,dataset,name,scale=None):
+        # codes are
+        # 'm01s02i463' liquid Reff
+        # 'm01s02i464' ice  Reff
+        # 'm01s02i451'  cloud fraction
+        # 'm01s02i452' liquid cloud fraction
+        # 'm01s02i453' ice cloud fraction
+        # 'm01s02i465' COSP MODIS ctp
+        modis_wt = name_fn('m01s02i330',dataset,name_type='stash') # COSP MODIS weight
+        modis_wt_value = name_fn(stash,dataset,name_type='stash') # COSP cld weighted value
+        if (modis_wt_value is None) or (modis_wt is None):
+            my_logger.warning(f"Failed to find modis_wt_value or modis_wt for {name} using stash {stash}")
+            return None
+        result = modis_wt_value.where(modis_wt > 1e-5) / modis_wt  # compute the effective radius
+        result = result.rename(name)  # rename the result
+        if scale is not None:
+            result = result * scale
+        return result
+        
+
+
+    def AOD(dataset:xarray.Dataset) -> typing.Optional[xarray.DataArray]:
+        """
+        Compute the Aerosol Optical Depth (AOD) at 550 nm. Uses the following stash codes (and names):
+        2240 -- Aitkin (soluble) abs optical depth
+        2241 -- Accumulation (soluble) abs optical depth
+        2242 -- Coarse (soluble) abs optical depth
+        2243 -- Aitkin (insoluble) abs optical depth
+        
+        :param dataset: dataset containing the data
+        :return: AOD as a DataArray or None if any of the components are not found.
+    """
+        ##2585 -- Mineral dust optical depth in radiation scheme
+        items = [285,300,301,302,303]  # stash item codes for AOD
+        # From Jane Mulchay -- To calculate the total AOD in UKESM1.1 you sum up the following stashcodes:
+        # 2300+2301+2302+2303+2285
+        result = 0.0 # initialise result
+        missing = []
+        for item in items:
+            stash = f'm01s02i{item:03d}'
+            da = name_fn(stash,dataset,name_type='stash')
+            if da is None:  # if not found then skip
+                missing += [stash]  # add to missing list
+            else:
+                result += da.sel(pseudo_level=pseudolev_550nm)  # get the dataArray for the item and  add to result
+        if len(missing) > 0:  # if any missing then return None
+            my_logger.warning(f"Failed to find AOD components {missing}")
+            return None
+        result = result.rename('AOD')  # rename the result
+        return result
+
+
+
+    lon,latitude_coord, vert,tc = UKESMlib.guess_coordinate_names(dataset[lookup_stash['m01s03i236']])  # 1.5 m air tempo.
     constrain_60S = dataset[latitude_coord] >= -60.
     # need to extract the actual values...
     constrain_60S = constrain_60S[latitude_coord][constrain_60S]
     # set up the data to be meaned. Because of xarray's use of dask no processed  happens till
     # spatial (And temporal ) means computed. See means.
     mass = name_fn('m01s50i063', dataset, name_type='stash')
+    #mass = name_fn('m01s30i115', dataset, name_type='stash')
     if mass is not None: # convert to mass/m^2
         lat, lon, vertical_coord,_ = UKESMlib.guess_coordinate_names(mass)
         area = np.cos(np.deg2rad(mass[lat])) * 6371e3  # simple cos lat weighting.
@@ -452,33 +451,34 @@ def genProcess(dataset:xarray.Dataset) -> typing.Dict[str,xarray.DataArray]:
         'RSR': name_fn('toa_outgoing_shortwave_flux', dataset, name_type='standard'),
         'RSRC': name_fn('toa_outgoing_shortwave_flux_assuming_clear_sky', dataset, name_type='standard'),
         'INSW': name_fn('toa_incoming_shortwave_flux', dataset, name_type='standard'),
-        'T2m': dataset[lookup_stash['m01s03i236']].sel({latitude_coord: constrain_60S}),
-        'Precip': dataset[lookup_std['precipitation_flux']].sel({latitude_coord: constrain_60S}),
-        'MSLP': dataset[lookup_std['air_pressure_at_sea_level']],
-        'Reff': modis_reff(dataset),
-        'ReffIce': modis_reff_ice(dataset),
-        'CLDtot': modis_cld_total(dataset),
-        'CLDliq': modis_cld_liquid(dataset),
-        'CLDice': modis_cld_ice(dataset),
-        'CTP': modis_cld_top_pressure(dataset),
-        'AOD': AOD(dataset),
-        'mineral_dust_AOD': mineral_dust_AOD(dataset),
+        'T2m':name_fn('m01s03i236',dataset,name_type='stash',**{latitude_coord: constrain_60S}),
+        'Precip': name_fn('precipitation_flux',dataset,name_type='standard',**{latitude_coord: constrain_60S}),
+        'MSLP': name_fn('air_pressure_at_sea_level',dataset,name_type='standard'),
+        'Reff': modis_fn('m01s02i463',dataset,'Reff'),
+        'ReffIce': modis_fn('m01s02i464',dataset,'ReffIce'),
+        'CLDtot': modis_fn('m01s02i451',dataset,'CLDtot'),
+        'CLDliq': modis_fn('m01s02i452',dataset,'CLDliq'),
+        'CLDice': modis_fn('m01s02i453',dataset,'CLDice'),
+        'CTP': modis_fn('m01s02i465',dataset,'CTP',scale=1e-2),
+        'AOD_550': AOD(dataset),
+        'Dust_AOD_550': name_fn('m01s02i285',dataset,name_type='stash',pseudo_level=pseudolev_550nm),
         # SO2 related.
         'SO2_col': total_column(name_fn('mass_fraction_of_sulfur_dioxide_in_air', dataset, name_type='name'),
                                 mass),
         # UM/UKCA does have total column diagnostics for H2SO4 but they are not in the UKESM1.1 diagnostics.
-        'h2so4_col': total_column(dataset[lookup_stash['m01s34i073']], mass), # alt try 38520
-        'nucleation_h2so4_col': total_column(dataset[lookup_stash['m01s34i102']], mass), # alt try 38485
-        'aitkin_h2so4_col': total_column(dataset[lookup_stash['m01s34i104']], mass), # alt try  38486
-        'accum_h2so4_col': total_column(dataset[lookup_stash['m01s34i108']], mass), # alt try 38487
-        'coarse_h2so4_col': total_column(dataset[lookup_stash['m01s34i114']], mass), # alt try 38488
-        'DMS_col': total_column(dataset[lookup_stash['m01s34i071']], mass),
         'Trop_SW_up': name_fn('tropopause_upwelling_shortwave_flux', dataset),
         'Trop_SW_net': name_fn('tropopause_net_downward_shortwave_flux', dataset),
         'Trop_LW_up': name_fn('tropopause_upwelling_longwave_flux', dataset),
         'Trop_LW_net': name_fn('tropopause_net_downward_longwave_flux', dataset),
 
     }
+    # add in total columsn
+    col_names = ['h2so4','nucleation_h2so4','aitkin_h2so4','accum_h2so4','coarse_h2so4','DMS']
+    stash_codes = ['m01s34i073','m01s34i102','m01s34i104','m01s34i108','m01s34i114','m01s34i071']
+    
+    for name,stash in zip(col_names,stash_codes):
+        process[name+'_col']= total_column(name_fn(stash,dataset,name_type='stash'), mass) # FIXME -- values are -ve
+
     # deal with T and rh values
     coord_500hPa = dict(pressure=500)  # co-ord value for 500 hPa
     coord_50hPa = dict(pressure=50)  # co-ord value for 50 hPa
@@ -489,65 +489,36 @@ def genProcess(dataset:xarray.Dataset) -> typing.Dict[str,xarray.DataArray]:
         if temp is not None:
             temp /= p_wt # scale by time above sfc.
             process.update(
-                {'T@50': temp.sel(coord_50hPa),
-                 'T@500': temp.sel(coord_500hPa)})
+                {'T@50': temp.sel(coord_50hPa).rename('T@50'),
+                 'T@500': temp.sel(coord_500hPa).rename('T@500')})
 
         # compute RH
         rh = name_fn('m01s30i206', dataset, name_type='stash')
         if rh is not None:
             rh /= p_wt # scale by time above sfc
             process.update(
-                {'RH@500': rh.sel(coord_500hPa),
-                 'RH@50': rh.sel(coord_50hPa), })
+                {'RH@500': rh.sel(coord_500hPa).rename('RH@500'),
+                 'RH@50': rh.sel(coord_50hPa).rename('RH@50'), })
 
 
-
-    process['netflux'] = process['INSW'] - process['RSR'] - process['OLR']
+            
+    process['netflux'] = (process['INSW'] - process['RSR'] - process['OLR']).rename('netflux')
+    # now remove excluded values. As using dask then processing does not actually happen till later!
+    # consider extending to use regexps
+    for var in exclude_vars:
+        process[var]=None # just set the variable to None and then it won't get processed
+        my_logger.debug(f'Excluded {var}')
 
     return process
 
 
-def means(dataArray, name):
-    """ 
-    Compute means for NH extra tropics, Tropics and SH extra Tropics. 
-    Tropics is 30N to 30S. NH extra tropics 30N to 90N and SH extra tropics 90S to 30S 
-    Arguments:
-        :param dataArray -- dataArray to be processed
-        :param name -- name to call mean.
 
-
-
-    """
-
-    latitude_coord, lon, vert,_ = UKESMlib.guess_coordinate_names(dataArray)
-
-    wt = np.cos(np.deg2rad(dataArray[latitude_coord]))  # simple cos lat weighting.
-    # constraints and names for regions.
-    constraints = {
-        'GLOBAL': None,
-        'NHX': lambda y: y > 30.0,
-        'TROPICS': lambda y: (y >= -30) & (y <= 30.0),
-        'SHX': lambda y: y < -30.0,
-    }
-    means = dict()
-    for rgn_name, rgn_fn in constraints.items():
-        if rgn_fn is None:
-            v = dataArray.squeeze().weighted(wt).mean()
-        else:
-            msk = rgn_fn(dataArray[latitude_coord])  # T where want data
-            v = dataArray.where(msk, np.nan).squeeze().weighted(wt.where(msk, 0.0)).mean()
-        means[name + '_' + rgn_name] = float(v.load().squeeze().values)
-        # store the actual values -- losing all meta-data
-
-    return means  # means are what we want
-
-
+time_range_type = tuple[typing.Optional[str],typing.Optional[str]]
 def compute_values(files: typing.Iterable[pathlib.Path],
-                   output_file: pathlib.Path,
                    land_mask:xarray.DataArray,
-                   start_time: typing.Optional[str] = None,
-                   end_time: typing.Optional[str] = None,
-                   land_mask_fraction:float = 0.5) -> typing.Dict:
+                   time_range:typing.Optional[time_range_type] = None,
+                   exclude_vars:typing.Optional[list[str]] = None,
+                   land_mask_fraction:float = 0.5) -> xarray.Dataset:
     """
 
     :param files: iterable of files to readin
@@ -556,30 +527,42 @@ def compute_values(files: typing.Iterable[pathlib.Path],
     :param end_time:  end_time as iso date/time
     :return: dict of results
     """
-    dataset = read_UMfiles(files)
-    dataset = dataset.sel(time=slice(start_time, end_time))
-#    land_mask = dataset.land_area_fraction.isel(time=0).squeeze()  # land/sea mask
+    if all([file.suffix == '.pp' for file in files]):
+        my_logger.debug(f'Reading pp data from {len(files)}')
+        dataset = read_UMfiles(files)
+    elif all([file.suffix in ['.nc','.hdf'] for file in files]):
+        my_logger.info(f'Reading netcdf data from {len(files)} files')
+        dataset = xarray.open_mfdataset(files)
+    else:
+        raise ValueError(f'Files inconsisent - {files}')
+    if time_range is not None:
+        time=" ".join(dataset.time.dt.strftime('%Y-%m-%d').values)
+        dataset = dataset.sel(time=slice(*time_range))
+        if len(dataset.time) == 0:
+            raise ValueError(f'No data in time range {time_range} for times: {time}')
+        else:
+            my_logger.info(f'Procesing data for {len(dataset.time)} times')
 
     masks = UKESMlib.create_region_masks(land_mask,critical_value=land_mask_fraction)
-    process = genProcess(dataset)
+    process = genProcess(dataset,exclude_vars=exclude_vars)
 
     # now to process all the data making output.
-    results = dict()
+    results=dict()
     for name, dataArray in process.items():
         if dataArray is None:  # no dataarray for this name
-            logging.warning(f"{name} is None. Not processing")
+            my_logger.warning(f"{name} is None. Not processing")
             continue
-        ## TODO -- use UKESM1 means (and mask generation)
-        regrid = UKESMlib.conservative_regrid(dataArray,land_mask)
-        means = UKESMlib.compute_regional_averages(regrid, masks)
-        results.update(means)  # and stuff them into the results dict.
-        logging.debug(f"Processed {name} and got {means}")
-
-
-    # now to write the data
-    with open(output_file, 'w') as fp:
-        json.dump(results, fp, indent=2)
-
+        da = dataArray.squeeze(drop=True).reset_coords(drop=True)
+        lon,lat,_,_ = UKESMlib.guess_coordinate_names(da)
+        da = da.rename({lon:'longitude',lat:'latitude'}) # stadnardise co-ord names
+        regrid = UKESMlib.conservative_regrid(da,land_mask)
+        mean = UKESMlib.da_regional_avg(regrid, masks)
+        result = UKESMlib.process(mean).compute()
+        results[name] = result
+        my_logger.info(f'Processed {name}')
+    
+    results = xarray.Dataset(results)
+    
 
     return results
 
@@ -599,7 +582,32 @@ def do_work():
 
 
     """
+    ## code from cpt4-1 with prompt to track which arguments were set
+    class StoreWithFlag(argparse.Action):
+        def __call__(self, parser, namespace, values, option_string=None):
+            #if values is None:
+            #    vaalues = parser.get_default(self.dest)
+                
+            setattr(namespace,self.dest,values)
+            setattr(namespace, f"_{self.dest}_set", True)
+    
+    class StoreWithFlag_store_true(argparse._StoreTrueAction):
+        def __call__(self, parser, namespace, values, option_string=None):
+            #setattr(namespace,self.dest,values)
+            super().__call__(parser, namespace, values, option_string)
+            setattr(namespace, f"_{self.dest}_set", True)
 
+    class StoreWithFlag_count(argparse._CountAction):
+        def __call__(self, parser, namespace, values, option_string=None):
+            super().__call__(parser, namespace, values, option_string)
+            setattr(namespace, f"_{self.dest}_set", True)
+
+    class StoreWithFlag_BooleanOptionalAction(argparse.BooleanOptionalAction):
+        def __call__(self, parser, namespace, values, option_string=None):
+            super().__call__(parser, namespace, values, option_string)
+            setattr(namespace, f"_{self.dest}_set", True)
+
+    
     parser = argparse.ArgumentParser(description="""
     Post process Unified Model data to provide 32 simulated observations. Example use is:
     
@@ -625,88 +633,125 @@ def do_work():
     """
                                      )
     parser.add_argument("CONFIG", help="The Name of the Config file",type=pathlib.Path)
-    parser.add_argument("-d", "--dir", help="The Name of the input directory")
-    parser.add_argument("OUTPUT", nargs='?', default=None,
-                        help="The name of the output file. Will override what is in the config file")
-    parser.add_argument("--clean", help="Clean dumps from directory", action='store_true')
-    parser.add_argument("-v", "--verbose", help="Provide verbose output", action="count", default=0)
+    parser.add_argument("-d", "--dir",
+                        help="The Name of the input directory",type=pathlib.Path,
+                        action=StoreWithFlag,default=pathlib.Path('share/data/History_Data/'))
+    parser.add_argument("output_file", nargs='?', type=pathlib.Path,default='observations.json',
+                        help="The name of the output file. Will override what is in the config file",action=StoreWithFlag)
+    parser.add_argument("--clean", help="Clean dumps from directory", action=StoreWithFlag_BooleanOptionalAction,default=False)
+    parser.add_argument("-v", "--verbose", help="Provide verbose output", default=0,action=StoreWithFlag_count)
+    parser.add_argument('--log_level',help='Set logging level',default='WARNING',action=StoreWithFlag)
+    parser.add_argument('--time_range',help='Time range for data extraction',nargs=2,action=StoreWithFlag)
+    parser.add_argument('--mask_file',help='Name of file containing land_mask data',action=StoreWithFlag,type=pathlib.Path)
+    parser.add_argument('--mask_variable',help='Name of land mask variable',action=StoreWithFlag,default='field36')
+    parser.add_argument('--land_mask_fraction',help='Critical value for land',action=StoreWithFlag,default=0.5,type=float)
+    parser.add_argument('--file_pattern',help='File glob pattern to read data from',action=StoreWithFlag,default='*a.pm*.pp')
+    parser.add_argument('--exclude_vars',help='Things not to process',action=StoreWithFlag,default=[],nargs='+')
+    parser.add_argument('--timeseries',help='Have timeseries output',action=StoreWithFlag_BooleanOptionalAction,default=False)
+    parser.add_argument('--overwrite',help='Overwrite',action=StoreWithFlag_BooleanOptionalAction,default=True)
     args = parser.parse_args()  # and parse the arguments
+
     # setup processing
     with args.CONFIG.open('rt') as fp:
         options = json.load(fp)  # load the options from the config file
+    # set types appropriately -- based on args!
+    # Converting everything to the correct type.
+    for act in parser._actions: # hack using private part of parser
+        if act.type is not None:
+            try:
+                options[act.dest]=act.type(options[act.dest])
+                my_logger.debug(f'Converted {act.dest} to {act.type}')
+            except KeyError:
+                my_logger.debug(f'Did not find {act.dest} so no type conversion')
 
-    # work out the files if needed
-    if args.dir is None:
-        path = options.get('dir', 'share/data/History_Data/')  # path relative to model running dir.
-        rootdir = pathlib.Path.cwd() / path
-    else:
-        rootdir = pathlib.Path(args.dir)
-
-    if not rootdir.is_dir():
-        logging.warning(f"rootdir {rootdir} is not a dir")
-        sys.exit(1)
-    file_pattern = options.get("file_pattern", '*a.pm*.pp')  # file pattern to use.
-    files = list(rootdir.glob(file_pattern))
-
-    start_time = options.get('start_time')  # will use None to select all data
-    end_time = options.get('end_time')
-    land_mask_file = expand(options['mask_file'])
-    land_mask_var = options.get('mask_variable','field36')
     
-    land_mask_fraction = options.get("land_mask_fraction",0.5)
+    # overwrite the options with arg values if they were set
+    options.update({
+        arg_name:value for   arg_name,value in vars(args).items() if
+        getattr(args,f'_{arg_name}_set',False)})
+    # and update if cmd line is not None and options is None or not set.
+    options.update({
+        arg_name:value for   arg_name,value in vars(args).items() if
+        (options.get(arg_name,None) is None and value is not None and not (arg_name.endswith('_set') or arg_name.endswith('_comment')))})
+    
+    # set up the logger.
+    UKESMlib.setup_logging(options['log_level'])
+            
+    # write out the options to logger
+    for k,v in options.items():
+        my_logger.info(f'Option[{k}] = {v}')
 
+    # extract the options
+    rootdir = pathlib.Path(options['dir'])
+    file_pattern = options["file_pattern"]
+    time_range = options.get('time_range')
+    land_mask_file = expand(options['mask_file'])
+    land_mask_var = options['mask_variable']
+    land_mask_fraction = options["land_mask_fraction"]
+    timeseries = options['timeseries']
+    clean = options['clean']
+    output_file = options['output_file']  
+    verbose=options['verbose']
+    overwrite=options['overwrite']
+    exclude_vars=options['exclude_vars']
+
+    if output_file.exists() and not overwrite:
+        raise ValueError(f'Output file {output_file} exists and overwrite set to false')
+
+    files = list(rootdir.glob(file_pattern)) # files to process
+    if len(files) ==0:
+        ValueError("Failed to find any files. Exiting")
+    my_logger.info(f'Processing {len(files)}')
+
+
+    # Handle cleaing 
     clean_files = []
-    if args.clean:
+    if clean:
         clean_files = list(rootdir.glob("*a.d*_00"))  # pattern for dumps
         extra_files = list(rootdir.glob("*a.p[4,5,a,b,c,d,e,f,g,h,i,j,k,u,v]*")) # all the dump headers  generated. No idea why!
         clean_files += extra_files
 
-    if args.OUTPUT is None:
-        output_file = options['output_file']  # better be defined so throw error if not
-    else:
-        output_file = args.OUTPUT
-
-    output_file = expand(output_file)
-
-    verbose = args.verbose
-
-    if verbose:  # print out some helpful information...
-        print("dir", rootdir)
-        print("start_time", start_time)
-        print("end_file", end_time)
-        print("output", output_file)
-        print("clean_files", clean_files)
-        print("file_pattern", file_pattern)
-        print("land_mask_file",land_mask_file)
-        if verbose > 1:
-            print("options are ", options)
-
-    if len(files) ==0:
-        ValueError("Failed to find any files. Exiting")
-
-
     land_mask = xarray.load_dataset(land_mask_file,decode_times=False)[land_mask_var]
+    land_mask = land_mask.squeeze(drop=True)
 
-    results = compute_values(files, output_file,land_mask,
-                             start_time=start_time, end_time=end_time,
-                             land_mask_fraction=land_mask_fraction)
+    # all setup so can now compute the summary values.
+    results = compute_values(files, land_mask,
+                             time_range=time_range,
+                             land_mask_fraction=land_mask_fraction,
+                             exclude_vars=exclude_vars)
 
 
-    if verbose:  # print out the summary data for all created values
-        for name, value in results.items():
-            print(f"{name}: {value:.4g}")
-        print("============================================================")
+    if not timeseries: # time average unless we are a timeseries.
+        for k in results.keys():
+            results[k]=results[k].mean('time')
 
-    # and possibly clean the dumps
+    # write the data out
+    if output_file.suffix == '.json': # json file
+        # Want to flatten across variable for json
+        r2=dict()
+        for variable in results.keys():
+            series = results[variable].to_series()
+            r2.update(
+                {f'{variable}_{k}':float(v) for k,v in series.items()}
+            )
+        
+        with output_file.open('wt') as fp:
+            json.dump(r2, fp, indent=2)
+    elif output_file.suffix == '.nc': # just write it out for netcdf.
+        results.to_netcdf(output_file,unlimited_dims=['time'])
+    else:
+        raise ValueError(f'Do not know what to do with {output_file}')
+    
+    # and possibly clean the dumps -- probably not needed
     if len(clean_files) > 0:
         logging.warning(f"Deleting {len(clean_files)} files. Sleeping 10")
         time.sleep(10)
     for file in clean_files:
         if file.samefile(output_file) or file.suffix == '.pp' or file.suffix == 'nc':
-            logging.warning(f"Asked to delete {file} but either output file, pp or netcdf so not.")
+            logging.warning(f"Asked to delete {file} but either output file, pp or netcdf so not doing so.")
             continue
 
-        logging.warning(f"Deleting {file}")
+        logging.debug(f"Deleting {file}")
         file.unlink()  # remove it.
 
 

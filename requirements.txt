@@ -2,7 +2,7 @@ metomi-rose==2.2.0 # avoid most recent version.
 scikit-learn == 1.6
 f90nml
 xarray[complete]==2025.7
-xarray-regrid
+xarray-regrid[accel]
 pandas
 matplotlib
 cftime

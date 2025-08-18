@@ -1,4 +1,5 @@
-import xarray 
+import xarray
+import xarray_regrid
 import typing
 import logging
 import numpy as np
@@ -8,7 +9,8 @@ import os
 import sys
 import subprocess
 import pandas as pd
-my_logger = logging.getLogger(__name__)
+import iris
+my_logger = logging.getLogger('UKESM')
 
 ## work out base-dirs for data depening on machine
 host = socket.gethostname()
@@ -65,7 +67,7 @@ def setup_logging(level: typing.Optional[typing.Union[int, str]] = None,
     logger.setLevel(level)  # set the level
 
     console_handler = logging.StreamHandler()
-    fmt = '%(levelname)s:%(name)s:%(funcName)s: %(message)s'
+    fmt = '%(asctime)s %(levelname)s:%(name)s:%(funcName)s: %(message)s'
     formatter = logging.Formatter(fmt)
     console_handler.setFormatter(formatter)
 
@@ -168,11 +170,11 @@ def run_command(cmd_input: list):
 
 def guess_coordinate_names(da: xarray.DataArray) -> \
         tuple[typing.Optional[str],typing.Optional[str],typing.Optional[str],typing.Optional[str]]:
-    possible_lon_names = ['longitude', 'lon', 'x', 'long']
-    possible_lat_names = ['latitude', 'lat', 'y']
+    possible_lon_names = ['longitude','longitude_0','longitude_1', 'lon', 'x', 'long']
+    possible_lat_names = ['latitude', 'latitude_0','latitude_1','lat', 'y']  # TODO -- rewrite to use regexps
     possible_time_names = ['time', 't', 'date', 'valid_time']
     possible_vert_names = ['atmosphere_hybrid_sigma_pressure_coordinate',
-                     'altitude', 'pressure', 'air_pressure', 'depth','level','z','Z'
+                           'altitude', 'pressure', 'air_pressure', 'depth','level','z','Z',
                      'model_level_number','pressure_level']
     
     lon_name = next((n for n in possible_lon_names if n in da.dims), None)
@@ -195,7 +197,10 @@ def is_lon_lat(da: xarray.DataArray):
 def conservative_regrid(source: typing.Union[xarray.Dataset,xarray.DataArray],
                         target: xarray.DataArray
                         ) -> xarray.Dataset:
-    my_logger.info("Running conservative regridding...")
+    # TODO - make this only work for data-arrays and then use map for datasets.
+    # Will return None if field is not long/lat.
+    # And if field long.lat grid matches target -- just return it. No need for any more processing at that point.
+    my_logger.debug(f"Regridding {source.name}")
     # 1 -- check all are long/lat fields.
     if isinstance(source,xarray.Dataset):
         for var_name, var_data in source.data_vars.items():
@@ -247,7 +252,7 @@ def compute_area_weights(da: xarray.DataArray | xarray.Dataset) -> xarray.DataAr
     """
     Use cos(lat) weights instead of true area weights (suitable for regular grids).
     """
-    my_logger.info("Using cos(lat) weights...")
+
     lon_name, lat_name, _,_ = guess_coordinate_names(da)
     lat = da[lat_name]
 
@@ -255,29 +260,34 @@ def compute_area_weights(da: xarray.DataArray | xarray.Dataset) -> xarray.DataAr
     return weights
 
 
+def da_regional_avg(da:xarray.DataArray,masks: dict[str, xarray.DataArray]) -> xarray.DataArray:
+    my_logger.debug(f"Computing regional averages for {da.name}")
+    result = []
+    area_weights = compute_area_weights(da)
+    lon_name, lat_name, _,_ = guess_coordinate_names(da)
+    for region_name, mask in masks.items():
+        masked_var = da.where(mask)
+        mn = masked_var.weighted(area_weights.where(mask,0.0)).mean(dim=[lon_name, lat_name], skipna=True).squeeze(drop=True)
+        mn = mn.expand_dims(region=[region_name])
+        mn = mn.load()  # force dask to compute this.
+        result.append(mn)
+    result = xarray.concat(result, dim='region',coords='minimal')
+    return result
+
 def compute_regional_averages(ds: xarray.Dataset,
                               masks: dict[str, xarray.DataArray],
                               ) -> xarray.Dataset:
     my_logger.info("Computing regional averages...")
     results = {}
-    area_weights = compute_area_weights(ds)
 
-    lon_name, lat_name, _,_ = guess_coordinate_names(ds)
     for var_name, var_data in ds.data_vars.items():
         if not is_lon_lat(var_data):
-            logging.info(f'{var_name} is not a long/lat field. Skipping')
+            logging.debug(f'{var_name} is not a long/lat field. Skipping')
             continue
 
-        logging.info(f'Processing {var_name}')
 
-        result = []
-        for region_name, mask in masks.items():
-            masked_var = var_data.where(mask)
-            mn = masked_var.weighted(area_weights).mean(dim=[lon_name, lat_name], skipna=True)
-            mn = mn.expand_dims(region=[region_name])
-            mn.compute()  # force dask to compute this.
-            result.append(mn)
-        results[var_name] = xarray.concat(result, dim='region')
+
+        results[var_name] = da_regional_avg(var_data,masks)
 
     return xarray.Dataset(results)
 
@@ -297,7 +307,7 @@ def seasonal_cycle(ts: xarray.Dataset, season: str) -> xarray.Dataset:
 
     resamp = ts_seas.resample(time='YS-JAN')
     mean_seas = resamp.mean().where(resamp.count() == 3)
-    mean_seas = mean_seas.dropna('time').drop_dims('nbounds', errors='ignore')
+    mean_seas = mean_seas.dropna('time')##.drop_dims('nbounds', errors='ignore') # for datataray can't drop dims
     return mean_seas
 
 def mslp_process(ts: xarray.DataArray) -> xarray.DataArray:
@@ -329,7 +339,8 @@ def process(ts:xarray.Dataset,
 
     resamp = ts.resample(time='YS-JAN')
     mean = resamp.mean().where(resamp.count() == 12)  # compute annual means where there are 12 months of data
-    mean = mean.dropna('time').drop_dims('nbounds', errors='ignore')
+    #mean = mean.dropna('time').drop_dims('nbounds', errors='ignore')
+    mean = mean.dropna('time')
     # add in  seasonal cycle.
     ts_delta = seasonal_cycle(ts, 'jja') - seasonal_cycle(ts, 'djf')
     rgn_names = {r:r+'_'+'seas' for r in ts_delta.coords['region'].values}
@@ -356,3 +367,51 @@ def merge_cov(covariance: pd.DataFrame, covariance2: pd.DataFrame) -> pd.DataFra
     # Fill missing values
     merged: pd.DataFrame = merged.fillna(0)
     return merged
+
+
+def um_cubes(files:typing.Union[list[str],str],
+                 stash_codes:typing.Optional[list[str]]=None,
+                 intervals:typing.Optional[list[int]]=None,
+             inspect:bool = False,
+                 ):
+    """
+    Extract cubes from UM file(s) based on  stash cpdes and (optionally) intervals
+    It is a lot faster than std load which looks to work cubes for everything in the file. This can be very very slow... 
+    files: list of files to process. Each one should be readable by iris.fileformats.pp.load
+    stash_codes: list of strings of stash codes to extract. As long as your lsit is small then this function will save you time
+    intervals: Sampling intervals to filter on -- if provided. 
+    """
+    def count_fields(fields):
+        counts=dict()
+        for f in fields:
+            key=f'stash:{f.stash} lbtim:{f.lbtim} ia:{f.lbtim.ia} ib:{f.lbtim.ib} '
+            count = counts.get(key,0)+1
+            counts[key]=count
+        return counts
+    from  iris.fileformats.pp import load,load_pairs_from_fields
+    if isinstance(files,str):
+        files=[files]
+    cubes_f = []
+    for file in files:
+        my_logger.debug(f'Reading from {file}')
+        fields = list(load(file))
+        if inspect: # print everything out
+            counts = count_fields(fields)
+            print(f"stash codes & lbtim in {file}")
+            for k in sorted(counts.keys()):
+                print(f'{k} has {counts[k]} fields')
+            return None
+        if stash_codes is not None: # got some stash codes
+            fields = [f for f in fields if  str(f.stash) in stash_codes] # filter on stash codes.
+
+        if intervals is not None: # got some intervals
+             fields = [f for f in fields if (f.lbtim.ib !=2  or (f.lbtim.ib == 2 and  f.lbtim.ia in intervals))]
+        my_logger.debug(f'Read {len(fields)} fields after filtering')
+        new_cubes = [c for c,f in load_pairs_from_fields(fields) ] 
+        my_logger.debug(f'Converted to {len(new_cubes)} cubes')
+        cubes_f += new_cubes
+
+    my_logger.debug(f'Have {len(cubes_f)} cubes')
+    cubes = iris.util.combine_cubes(cubes_f)
+    my_logger.debug(f'Combined to {len(cubes)} cubes')
+    return cubes

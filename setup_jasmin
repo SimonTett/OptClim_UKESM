@@ -7,4 +7,8 @@ echo "OPT_UKESM_ROOT: ${OPT_UKESM_ROOT}"
 source $OPT_UKESM_ROOT/Opt_UKESM/bin/activate
 export PATH=$OPT_UKESM_ROOT/processing:$PATH
 export PYTHONPATH=$OPT_UKESM_ROOT:$PYTHONPATH
+export BASE_DIR=/gws/nopw/j04/terrafirma/tetts/data
+export BASE_DIR=/gws/nopw/j04/terrafirma/tetts/data
+export BASE_DIR=/gws/nopw/j04/terrafirma/tetts/data
+export PROCESS_DIR=/gws/nopw/j04/terrafirma/tetts/data/processed/
 
