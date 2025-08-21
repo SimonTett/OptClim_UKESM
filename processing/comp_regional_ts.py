@@ -23,7 +23,7 @@ import xarray_regrid # regridding in xarray
 import glob
 
 import UKESMlib
-
+from processing.process_modis_aatsr import latitude
 
 my_logger = logging.getLogger('comp_regional_ts')  # create a logger for this module
 
@@ -110,14 +110,17 @@ def process_files(input_files: list[str],
                   critical_value: float = 0.5,
                   variables: Optional[list[str]] = None,
                   rename_vars: Optional[dict[str,str]] = None,
-                  time_range:Optional[tuple[pd.Timestamp,pd.Timestamp]]=None) -> xarray.Dataset:
+                  time_range:Optional[tuple[pd.Timestamp,pd.Timestamp]]=None,
+                  latitude_range:Optional[tuple[float,float]] = None) -> xarray.Dataset:
     my_logger.info("Starting file processing...")
 
     land_fract = xarray.load_dataarray(land_sea_file,decode_times=False).squeeze(drop=True).drop_vars(['surface','t'],errors='ignore')
     lon_name, lat_name, _,_ = UKESMlib.guess_coordinate_names(land_fract)
     land_fract = land_fract.rename({lon_name:'longitude',lat_name:'latitude'}).transpose('latitude','longitude') # in right order.
-
-    # need to make this something that is specified
+    if latitude_range is not None:
+        my_logger.info(f'Selecting latitude range: {latitude_range} for land fraction data')
+        land_fract = land_fract.sel(latitude=slice(*latitude_range))
+    # need to make masks  something that is specified
     masks = UKESMlib.create_region_masks(land_fract,  critical_value)
     if len(input_files) < 5:
         my_logger.info(f"Processing files: {input_files}")
@@ -149,6 +152,13 @@ def process_files(input_files: list[str],
                 if timec is not None:
                     my_logger.info(f'Selecting time range: {time_range} for variable {var_name} using coord {timec}')
                     ds[var_name] = var_data.sel({timec:slice(*time_range)})
+
+        if latitude_range is not None:
+            for var_name, var_data in ds.data_vars.items():
+                _, latc, _, _ = UKESMlib.guess_coordinate_names(var_data)
+                if latc is not None:
+                    my_logger.info(f'Selecting latitude range: {latitude_range} for variable {var_name} using coord {latc}')
+                    ds[var_name] = var_data.sel({latc:slice(*latitude_range)})
 
 
         my_logger.info(f'Processing {list(ds.data_vars.keys())} variables')
@@ -202,15 +212,16 @@ def main():
     parser.add_argument('--output_file', required=True,type=pathlib.Path)
     parser.add_argument('--critical_value', type=float, default=0.5,
                          help='Values >= this are land; less than Sea')
-    group = parser.add_mutually_exclusive_group()
-    group.add_argument('--overwrite', dest='overwrite', action='store_true', help='Enable overwrite')
-    group.add_argument('--nooverwrite', dest='overwrite', action='store_false', help='Disable overwrite')
-    parser.set_defaults(overwrite=False)
+
+    parser.add_argument('--overwrite', action=argparse.BooleanOptionalAction, help='Overwrite',default=False)
+
     parser.add_argument('--log_level', type=str, default='WARNING', help='Log level of of the script')
     parser.add_argument('--rename', type=str, nargs='+',default=None,
                         help='Pairs of variable names to rename in the form old_name:new_name, e.g. tas:temperature. Variable selection occurs before renaming.')
     parser.add_argument('--time_range', nargs=2, type=pd.Timestamp, default=None
                         , help='Time range to use for processing. If not provided, all times will be used.')
+    parser.add_argument('--latitude_range', nargs=2, type=float, default=None,
+                        help='Latitude range to use for processing. If not provided, all latitudes will be used.')
     args = parser.parse_args()
     my_logger = UKESMlib.setup_logging(rootname='comp_regional_ts',level = args.log_level)
     input_files = []
@@ -231,7 +242,7 @@ def main():
 
 
     if (not args.overwrite) and args.output_file.exists():
-        my_logger.warning(f'File {args.output_file} exists. See --overwrite to overwrite it')
+        my_logger.warning(f'File {args.output_file} exists. Set --overwrite to overwrite it')
         exit(0)
     rename_vars = args.rename
     if rename_vars is not None:
@@ -241,7 +252,8 @@ def main():
         raise ValueError(f"Land/Sea file {args.land_sea_file} does not exist.")
     process_files(input_files, args.land_sea_file, args.output_file,
                   critical_value=args.critical_value, variables=args.variables,rename_vars=rename_vars,
-                  time_range =args.time_range)
+                  time_range =args.time_range,
+                  latitude_range = args.latitude_range)
 
 
 if __name__ == '__main__':

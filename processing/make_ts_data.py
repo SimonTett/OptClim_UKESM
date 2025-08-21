@@ -93,6 +93,10 @@ if preprocess:
     my_logger.info('Running convert_BEST.py')
     result = run_command(['convert_BEST.py', f"{data_dir}/BEST/Complete_TAVG_LatLong1.nc"]) # Run convert_BEST.py
 
+    my_logger.info('Extracting MODIS AOD data')
+    result = run_command(['extract_modis_aod.py', f"{data_dir}/modis_aerosol/*/*/*.hdf",
+                         '--output', f"{data_dir}/modis_aersol_extract.nc"])  # Run extract_modis_aod.py
+
 
 # Modis cloud
 cmd = cmd_root+ [f'{ts_dir}/modis_cloud_ts.nc', f'{data_dir}/modis_cloud_extract/*.nc']+ \
@@ -100,13 +104,25 @@ cmd = cmd_root+ [f'{ts_dir}/modis_cloud_ts.nc', f'{data_dir}/modis_cloud_extract
 
 result = run_command(cmd)
 
+# modis aerosol
+cmd = cmd_root+ [f'{ts_dir}/modis_aerosol_ts.nc', f'{data_dir}/modis_aerosol_extract.nc']+ \
+    ['--longitude_range', '-55', '55']
+
+
 # AATSR cloud
 cmd = cmd_root + [f'{ts_dir}/aatsr_cloud_ts.nc', f'{data_dir}/AATSR_cloud_extract/*.nc'] + \
     ['--variables'] + sat_cld_vars + ['--rename'] + sat_rename
 
 result = run_command(cmd)
 
-
+# AATSR aerosol. Data on jasmin. So need to run code on jasmin (or move it to the data directory)
+aatsr_aerosol_dir = pathlib.Path('/gws/nopw/j04/ukesm_acme/obs_data/AATSR_aerosol_extract')
+if not aatsr_aerosol_dir.exists():
+    my_logger.error(f"AATSR aerosol directory {aatsr_aerosol_dir} does not exist. Please check the path.")
+else:
+    cmd = cmd_root + [f'{ts_dir}/aatsr_aerosol_ts.nc', str(aatsr_aerosol_dir / 'ESACCI-L3C_AEROSOL-CLIM_PRODUCTS-AATSR_ENVISAT-fv3.0.nc')] + \
+        ['--variables', 'AOD550', '--rename', 'AOD550:AOD_550']
+    result = run_command(cmd)
 
     
 

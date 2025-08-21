@@ -177,22 +177,28 @@ for ref_file, other_file in files.items():
     covariance_data = xarray.concat([ref, other], dim='obs_sample')
     if args.covariance_time:
         covariance_data = covariance_data.sel(time=slice(*args.covariance_time))
-
-    covariance_data = covariance_data.stack(sample=('time', 'obs_sample')).transpose('sample', 'region')
     # load the data now
     logging.info('Loading data now')
     covariance_data = covariance_data.load()  # force the load to avoid lazy loading issues
+    # remove the dataset mean from each variable
+    obs_mean = covariance_data.mean('obs_sample')
+    covariance_data = covariance_data - obs_mean
+
+    covariance_data = covariance_data.stack(sample=('time', 'obs_sample')).transpose('sample', 'region')
+
     # estimate the covariance
-    tgt,cov = estimate_loc_cov(covariance_data)
-    if args.target_time is not None:
-        # select the target time range
-        tgt_sub = covariance_data.unstack().sel(time=slice(*args.target_time)).mean(['time','obs_sample'])  # mean over the sample dimension
-        # and then convert to a Series based on var_name, region.
-        tgt_dict = dict()
-        for var_name,var_data in tgt_sub.data_vars.items():
-            for region in var_data.coords['region'].values:
-                tgt_dict[f'{var_name}_{region}'] = var_data.sel(region=region).mean().item()  # mean over the region
-        tgt = pd.Series(tgt_dict, name='target')
+    loc,cov = estimate_loc_cov(covariance_data)
+
+    tgt = obs_mean.sel(time=slice(*args.target_time)).mean('time')# select the target time range
+    tgt_series=[]
+    for name,da in tgt.data_vars.items():
+        t= da.to_series()
+        t.index = [f'{name}_{r}' for r in t.index]  # rename the index to include the variable name
+        tgt_series.append(t)  # append the target series to the list
+    tgt = pd.concat(tgt_series, axis=0).reindex(cov.index)  # concatenate all the target values into a single Series
+    if tgt.isnull().any():
+        raise ValueError(f"Target values contain NaNs after processing {ref_file} and {other_file}. Please check the data.")
+
     tgt.index.name = 'var_name_region'  # set the index name for the target Series
     all_tgt += [tgt]  # append the target values to the list
     all_cov = UKESMlib.merge_cov(all_cov, cov)  # merge the covariance matrix with the
