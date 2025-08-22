@@ -23,7 +23,7 @@ import xarray_regrid # regridding in xarray
 import glob
 
 import UKESMlib
-from processing.process_modis_aatsr import latitude
+
 
 my_logger = logging.getLogger('comp_regional_ts')  # create a logger for this module
 
@@ -153,12 +153,14 @@ def process_files(input_files: list[str],
                     my_logger.info(f'Selecting time range: {time_range} for variable {var_name} using coord {timec}')
                     ds[var_name] = var_data.sel({timec:slice(*time_range)})
 
-        if latitude_range is not None:
-            for var_name, var_data in ds.data_vars.items():
-                _, latc, _, _ = UKESMlib.guess_coordinate_names(var_data)
-                if latc is not None:
-                    my_logger.info(f'Selecting latitude range: {latitude_range} for variable {var_name} using coord {latc}')
-                    ds[var_name] = var_data.sel({latc:slice(*latitude_range)})
+        # if latitude_range is not None:
+        #     for var_name, var_data in ds.data_vars.items():
+        #         _, latc, _, _ = UKESMlib.guess_coordinate_names(var_data)
+        #         if latc is not None:
+        #             my_logger.info(f'Selecting latitude range: {latitude_range} for variable {var_name} using coord {latc}')
+        #             breakpoint() # FIXME.Cope with reversed co-ordinates... Flaw with xarray
+        #             # in that its selection makes assumptions about ordering of co-ordinates
+        #             ds[var_name] = var_data.sel({latc:slice(*latitude_range)})
 
 
         my_logger.info(f'Processing {list(ds.data_vars.keys())} variables')
@@ -190,7 +192,7 @@ def process_files(input_files: list[str],
     attrs = ds.attrs.copy()
     for key in  bad_keys:
         attrs.pop(key,None)
-    regional_avg.attrs.update(attrs) # update the attribues. Sigh meta-data
+    regional_avg.attrs.update(attrs) # update the attributes. Sigh meta-data
 
     regional_avg.attrs.update(attrs)
     regional_avg.attrs['description'] = 'Regional average data'
