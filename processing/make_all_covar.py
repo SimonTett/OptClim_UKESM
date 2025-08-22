@@ -76,6 +76,10 @@ name = 'netflux_global'
 final_target[name] = float(nf)  # convert to scalar
 netflux_cov = pd.DataFrame(0.1**2, index=[name], columns=[name])  # uncertainty is 0.1 W/m^2
 final_cov = UKESMlib.merge_cov(final_cov, netflux_cov)
+final_target = final_target.reindex(final_cov.index, fill_value=np.nan)  # reindex target to match covariance
+# check no missing data
+if final_target.isna().any():
+    raise ValueError(f"Missing data in final target: {final_target[final_target.isna()].index.tolist()}")
 # write the final target and covariance to files.
 final_target.to_json(target_file, indent=2)
 final_cov.to_csv(cov_file, index_label='region')
