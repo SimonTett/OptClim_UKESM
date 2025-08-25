@@ -15,7 +15,7 @@ my_logger = logging.getLogger('UKESM')
 
 ## work out base-dirs for data depening on machine
 host = socket.gethostname()
-on_jasmin =re.match('sci-vm-0\d.jasmin.ac.uk',host)
+on_jasmin =re.match(r'sci-vm-0\d.jasmin.ac.uk',host)
 try:
     base_dir = pathlib.Path(os.getenv('BASE_DIR'))
 except TypeError as e: # failed coz BASE_DIR does not exist

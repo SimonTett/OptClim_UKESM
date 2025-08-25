@@ -55,6 +55,7 @@ if (not args.overwrite) and args.output.exists():
 aod=[extract_modis_aod(f) for f in sorted(args.input_files)]
 aod = xarray.concat(aod, dim='time')
 aod.to_netcdf(args.output) # and save the file
+my_logger.info('Wrote data to {args.outut}')
 ## lets make a plot
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
