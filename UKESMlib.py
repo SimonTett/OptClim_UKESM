@@ -26,7 +26,7 @@ except TypeError as e: # failed coz BASE_DIR does not exist
         base_dir=pathlib.Path('gws/nopw/j04/terrafirma/tetts/data')
 
     else:
-        raise ValueError('Do not know how to define base_dir.  Define BASE_DIR or modify code')
+        my_logger.warning('Do not know how to define base_dir.  Define BASE_DIR or modify code')
 
 try:
     process_dir = pathlib.Path(os.getenv('PROCESS_DIR'))
@@ -37,7 +37,7 @@ except TypeError as e:  # failed coz PROCESS_DIR does not exist
     elif on_jasmin:
         process_dir = base_dir/'processing'
     else:
-        raise ValueError('Do not know how to define process_dir.  Define PROCESS_DIR or modify code')
+        my_logger.warning('Do not know how to define process_dir.  Define PROCESS_DIR or modify code')
 
 
 def setup_logging(level: typing.Optional[typing.Union[int, str]] = None,
@@ -387,6 +387,8 @@ def um_cubes(files:typing.Union[list[str],str],
     files: list of files to process. Each one should be readable by iris.fileformats.pp.load
     stash_codes: list of strings of stash codes to extract. As long as your lsit is small then this function will save you time
     intervals: Sampling intervals to filter on -- if provided. 
+    Only works at iris version 3.12 or larger. If at lower version then 
+    just loads all cubes in the files... Very slow for large files!
     """
     def count_fields(fields):
         counts=dict()
@@ -398,6 +400,13 @@ def um_cubes(files:typing.Union[list[str],str],
     from  iris.fileformats.pp import load,load_pairs_from_fields
     if isinstance(files,str):
         files=[files]
+    try:
+        from iris.util import combine_cubes
+    except ImportError:
+        my_logger.warning("No combine_cubes method. Doing things the hard and slow way...")
+        cubes = iris.load(files)
+        return cubes
+    
     cubes_f = []
     for file in files:
         my_logger.debug(f'Reading from {file}')
@@ -419,6 +428,6 @@ def um_cubes(files:typing.Union[list[str],str],
         cubes_f += new_cubes
 
     my_logger.debug(f'Have {len(cubes_f)} cubes')
-    cubes = iris.util.combine_cubes(cubes_f)
+    cubes = combine_cubes(cubes_f)
     my_logger.debug(f'Combined to {len(cubes)} cubes')
     return cubes
