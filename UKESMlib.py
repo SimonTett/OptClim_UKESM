@@ -255,12 +255,16 @@ def create_region_masks(land_fract: xarray.DataArray,
     return masks
 
 
-def compute_area_weights(da: xarray.DataArray | xarray.Dataset) -> xarray.DataArray:
+def compute_area_weights(da: typing.Union[xarray.DataArray | xarray.Dataset]) -> xarray.DataArray:
     """
     Use cos(lat) weights instead of true area weights (suitable for regular grids).
+    Modify code (well anything that calls it) to be DataArrays and then use map for datasets.
     """
 
     lon_name, lat_name, _,_ = guess_coordinate_names(da)
+    if lat_name is None:
+        my_logger.warning(f'Cannot determine latitude coordinate name for {da.name}. Returning uniform weights.')
+        return xarray.ones_like(da)
     lat = da[lat_name]
 
     weights = np.cos(np.deg2rad(lat))
@@ -271,7 +275,7 @@ def da_regional_avg(da:xarray.DataArray,masks: dict[str, xarray.DataArray]) -> x
     my_logger.debug(f"Computing regional averages for {da.name}")
     result = []
     area_weights = compute_area_weights(da)
-    lon_name, lat_name, _,_ = guess_coordinate_names(da)
+    lon_name, lat_name, _,time_name = guess_coordinate_names(da)
     for region_name, mask in masks.items():
         masked_var = da.where(mask)
         mn = masked_var.weighted(area_weights.where(mask,0.0)).mean(dim=[lon_name, lat_name], skipna=True).squeeze(drop=True)
@@ -279,6 +283,10 @@ def da_regional_avg(da:xarray.DataArray,masks: dict[str, xarray.DataArray]) -> x
         mn = mn.load()  # force dask to compute this.
         result.append(mn)
     result = xarray.concat(result, dim='region',coords='minimal')
+    result.attrs = da.attrs
+    for c in [lon_name, lat_name]:
+        result.attrs[c+'_range'] = [float(da[c].min()), float(da[c].max())]
+
     return result
 
 def compute_regional_averages(ds: xarray.Dataset,
@@ -291,14 +299,11 @@ def compute_regional_averages(ds: xarray.Dataset,
         if not is_lon_lat(var_data):
             logging.debug(f'{var_name} is not a long/lat field. Skipping')
             continue
-
-
-
         results[var_name] = da_regional_avg(var_data,masks)
 
     return xarray.Dataset(results)
 
-def seasonal_cycle(ts: xarray.Dataset, season: str) -> xarray.Dataset:
+def seasonal_cycle(ts: xarray.Dataset, season: str) -> typing.Optional[xarray.Dataset]:
     """
     Compute the seasonal cycle for a given season.
     :param ts: xarray Dataset with time as a coordinate.
@@ -311,7 +316,10 @@ def seasonal_cycle(ts: xarray.Dataset, season: str) -> xarray.Dataset:
         ts_seas = ts.where(ts['time.month'].isin([12, 1, 2]), drop=True)
     else:
         raise ValueError("Season must be 'jja' or 'djf'.")
-
+    # can only do this if have enough months..
+    if len(ts_seas.time) == 0:# no data at all so return None
+        return None
+    
     resamp = ts_seas.resample(time='YS-JAN')
     mean_seas = resamp.mean().where(resamp.count() == 3)
     mean_seas = mean_seas.dropna('time')##.drop_dims('nbounds', errors='ignore') # for datataray can't drop dims
@@ -325,23 +333,27 @@ def mslp_process(ts: xarray.DataArray) -> xarray.DataArray:
     :return: processed xarray Dataset.
     """
 
-    if str(ts.name).lower() not in  ['slp','mslp','mean_sea_level_pressure']:
+    if str(ts.name).lower() not in  ['slp','mslp','mean_sea_level_pressure','air_pressure_at_sea_level']:
         my_logger.warning(f'Variable {ts.name} is not a recognized SLP variable. Processing as is.')
     my_logger.info(f'Processing SLP variable {ts.name} to convert to difference from global mean.')
     # remove the global mean and add_delta to the region names.
-    result = (ts-ts.sel(region='global').values).where(ts.region != 'global', drop=True)
+    result = (ts-ts.sel(region='global').squeeze(drop=True)).where(ts.region != 'global', drop=True)
     region_names = [r+'_DGM' for r in result.coords['region'].values ]
     result = result.assign_coords(region=region_names)  # rename the regions
+    # add back in the global-average.
+    result = xarray.concat([result,ts.sel(region='global')],dim='region')
+
 
     return result
 def process(ts:xarray.Dataset,
-            mslp_vars:typing.Optional[list[str]]=None
+            #   mslp_vars:typing.Optional[list[str]]=None
             ) -> xarray.Dataset:
     # do data processing on the time series.
 
-    if mslp_vars is not None:
-        my_logger.info('Special processing enabled. ')
-        ts = ts.merge(ts[mslp_vars].map(mslp_process))  # apply special processing to each variable
+    #if mslp_vars is not None:
+    #    my_logger.info('Special processing enabled. ')
+    #    ts = ts.merge(ts[mslp_vars].map(mslp_process))  # apply special processing to each variable
+
 
 
     resamp = ts.resample(time='YS-JAN')
@@ -349,10 +361,13 @@ def process(ts:xarray.Dataset,
     #mean = mean.dropna('time').drop_dims('nbounds', errors='ignore')
     mean = mean.dropna('time')
     # add in  seasonal cycle.
-    ts_delta = seasonal_cycle(ts, 'jja') - seasonal_cycle(ts, 'djf')
-    rgn_names = {r:r+'_'+'seas' for r in ts_delta.coords['region'].values}
-    ts_delta= ts_delta.assign_coords(region = [rgn_names.get(r,r) for r in ts.coords['region'].values])
-    result = xarray.concat([mean, ts_delta], dim='region').load()
+    try:
+        ts_delta = seasonal_cycle(ts, 'jja') - seasonal_cycle(ts, 'djf')
+        rgn_names = {r:r+'_'+'seas' for r in ts_delta.coords['region'].values}
+        ts_delta= ts_delta.assign_coords(region = [rgn_names.get(r,r) for r in ts.coords['region'].values])
+        result = xarray.concat([mean, ts_delta], dim='region').load()
+    except TypeError: # catch nones coming back
+        my_logger.warning(f'Problem computing seasonal means for {ts.name}')
     return result
 
 def merge_cov(covariance: pd.DataFrame, covariance2: pd.DataFrame) -> pd.DataFrame:
@@ -382,7 +397,7 @@ def um_cubes(files:typing.Union[list[str],str],
              inspect:bool = False,
                  ):
     """
-    Extract cubes from UM file(s) based on  stash cpdes and (optionally) intervals
+    Extract cubes from UM file(s) based on  stash cpdes, and (optionally) intervals
     It is a lot faster than std load which looks to work cubes for everything in the file. This can be very very slow... 
     files: list of files to process. Each one should be readable by iris.fileformats.pp.load
     stash_codes: list of strings of stash codes to extract. As long as your lsit is small then this function will save you time

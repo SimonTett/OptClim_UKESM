@@ -1,7 +1,7 @@
 {
     "_comment":"Options for post-processing. Broadly anything with null values will get default values given by the script",
     "output_file": "obs.json",
-    "mask_file": "post_process/land_frac.nc",
+    "mask_file": "$OPT_UKESM_ROOT/post_process/land_frac.nc",
     "mask_file_comment": "Path for landfrac file.",
     "mask_variable":"field36",
     "mask_variable_comment":"Variable name for the mask field",
@@ -11,7 +11,7 @@
     "time_range_comment": "Start & end time as ISO std string or null for no start or end. ",
     "timeseries":false,
     "timeseries_comment":"If true post processing code will write timeseries out",
-    "file_pattern": "*a.pm*.pp",
+    "file_pattern": "*a.pz*.pp",
     "file_pattern_comment": "File pattern to match for post-processing. Normal glob rules ",
     "exclude_vars":null,
     "exclude_vars_comment":"List of variables to exclude"

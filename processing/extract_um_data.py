@@ -16,8 +16,8 @@ parser.add_argument("FILES",nargs='+',help='List of files to read')
 parser.add_argument('--stash',help='List of stash codes to extract',nargs='+')
 parser.add_argument('--samples',help='List of sampling times to extract',nargs='+',type=int)
 parser.add_argument('--output',help='File to output to.')
-parser.add_argument('--log_level',help='Set logging level',default='WARNING')
-parser.add_argument('--overwrite',help='Overwrite existing file',type=bool)
+parser.add_argument('--log_level',help='Set logging level')
+parser.add_argument('--overwrite',help='Overwrite',action=argparse.BooleanOptionalAction)
 parser.add_argument('--unlimited_dims',help='List of unlimited dimensions',nargs='+')
 parser.add_argument('--select_file',
                     help='filepath to json file containing selection info. Will replace stash and sampling ',

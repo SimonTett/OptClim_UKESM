@@ -1,11 +1,13 @@
 metomi-rose==2.2.0 # avoid most recent version.
 scikit-learn == 1.6
 f90nml
-xarray[complete]==2025.7
-xarray-regrid[accel]
+xarray[complete]==2025.7 ; python_version > '3.10'
+xarray[complete] ; python_version <= '3.10' # take the most current version that works
+scitools-iris  ; sys_platform != 'windows' # need conda install for iris in windows
+xarray-regrid[accel] ; python_version > '3.9'
 pandas
 matplotlib
 cftime
 ipython
-scipy == 1.15
+scipy
 
