@@ -1,5 +1,5 @@
 {
-    "_comment":"Options for post-processing. Broadly anything with null values will get default values given by the script",
+    "_comment":"Options for post-processing. Broadly anything with null values will get default values given by the script. See script for details",
     "output_file": "obs.json",
     "mask_file": "$OPT_UKESM_ROOT/post_process/land_frac.nc",
     "mask_file_comment": "Path for landfrac file.",

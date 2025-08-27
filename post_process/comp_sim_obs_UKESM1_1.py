@@ -31,7 +31,7 @@ import numpy as np
 import xarray
 import logging
 import UKESMlib
-
+import sys
 import warnings # so we can supress iris warnings...
 
 
@@ -530,7 +530,7 @@ def compute_values(files: list[pathlib.Path],
                    land_mask:xarray.DataArray,
                    time_range:typing.Optional[time_range_type] = None,
                    exclude_vars:typing.Optional[list[str]] = None,
-                   land_mask_fraction:float = 0.5) -> xarray.Dataset:
+                   land_mask_fraction:float = 0.5) -> dict[str,xarray.DataArray]:
     """
 
     :param files: iterable of files to readin
@@ -582,12 +582,13 @@ def compute_values(files: list[pathlib.Path],
         if name in ['MSLP']: # pressure
             mean = UKESMlib.mslp_process(mean)
 
+
             
         result = UKESMlib.process(mean).compute()
         results[name] = result
         my_logger.info(f'Processed {name}')
     
-    results = xarray.Dataset(results)
+    
     
 
     return results
@@ -634,9 +635,8 @@ def do_work():
       Northern Hemisphere Extra-tropical and Tropical Mean Sea Level Pressure difference from global average
     """
                                      )
-    defaults = dict(dir='share/data/History_Data/',
+    defaults = dict(dir='data',
                           output_file='observations.json',
-                          clean=False,
                           log_level = 'WARNING',
                           mask_variable='field36',
                           land_mask_fraction=0.5,
@@ -651,8 +651,7 @@ def do_work():
                         help="The Name of the input directory",type=pathlib.Path)
     parser.add_argument("output_file",  nargs='?',type=pathlib.Path,
                         help="The name of the output file.")
-    parser.add_argument("--clean", help="Clean dumps from directory", action=argparse.BooleanOptionalAction)
-    parser.add_argument('--log_level',help='Set logging level',default='WARNING')
+    parser.add_argument('--log_level',help='Set logging level')
     parser.add_argument('--time_range',help='Time range for data extraction',nargs=2)
     parser.add_argument('--mask_file',help='Name of file containing land_mask data',type=pathlib.Path)
     parser.add_argument('--mask_variable',help='Name of land mask variable')
@@ -661,7 +660,9 @@ def do_work():
     parser.add_argument('--exclude_vars',help='Things not to process',nargs='+')
     parser.add_argument('--timeseries',help='Have timeseries output',action=argparse.BooleanOptionalAction)
     parser.add_argument('--overwrite',help='Overwrite',action=argparse.BooleanOptionalAction)
+    parser.add_argument('--print-defaults',help='Print out defaults, actual values  and then exit',action='store_true')
     args = parser.parse_args()  # and parse the arguments
+
     
     # setup processing
     with args.CONFIG.open('rt') as fp:
@@ -699,26 +700,25 @@ def do_work():
     land_mask_var = options['mask_variable']
     land_mask_fraction = options["land_mask_fraction"]
     timeseries = options['timeseries']
-    clean = options['clean']
     output_file = expand(options['output_file'])
     overwrite=options['overwrite']
     exclude_vars=options['exclude_vars']
+    print_defaults=options['print_defaults']
+    if print_defaults:
+        print('Default values are ')
+        for key,value in defaults.items():
+            print(f'Default: {key} = {value} Actual:{options[key]}')
+        sys.exit(0) # exit the script
+    # end of dealing with printing out defaults
 
     if output_file.exists() and not overwrite:
         raise ValueError(f'Output file {output_file} exists and overwrite set to false')
 
-    files = list(rootdir.glob(file_pattern)) # files to process
+    files = list(rootdir.rglob(file_pattern)) # files to process. Uses recursive glob
     if len(files) ==0:
         ValueError("Failed to find any files. Exiting")
     my_logger.info(f'Processing {len(files)}')
 
-
-    # Handle cleaning -- FIXME needs modification as files are in 'strange' place.
-    clean_files = []
-    if clean:
-        clean_files = list(rootdir.glob("*a.d*_00"))  # pattern for dumps
-        extra_files = list(rootdir.glob("*a.p[4,5,a,b,c,d,e,f,g,h,i,j,k,u,v]*")) # all the dump headers  generated. No idea why!
-        clean_files += extra_files
 
     land_mask = xarray.load_dataset(land_mask_file,decode_times=False)[land_mask_var]
     land_mask = land_mask.squeeze(drop=True)
@@ -747,21 +747,10 @@ def do_work():
         with output_file.open('wt') as fp:
             json.dump(r2, fp, indent=2)
     elif output_file.suffix == '.nc': # just write it out for netcdf.
-        results.to_netcdf(output_file,unlimited_dims=['time'])
+        xarray.Dataset(results).to_netcdf(output_file,unlimited_dims=['time'])
     else:
         raise ValueError(f'Do not know what to do with {output_file}')
     
-    # and possibly clean the dumps -- probably not needed
-    if len(clean_files) > 0:
-        logging.warning(f"Deleting {len(clean_files)} files. Sleeping 10")
-        time.sleep(10)
-    for file in clean_files:
-        if file.samefile(output_file) or file.suffix == '.pp' or file.suffix == 'nc':
-            logging.warning(f"Asked to delete {file} but either output file, pp or netcdf so not doing so.")
-            continue
-
-        logging.debug(f"Deleting {file}")
-        file.unlink()  # remove it.
 
 
 if __name__ == "__main__":

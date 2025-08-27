@@ -346,14 +346,8 @@ def mslp_process(ts: xarray.DataArray) -> xarray.DataArray:
 
     return result
 def process(ts:xarray.Dataset,
-            #   mslp_vars:typing.Optional[list[str]]=None
             ) -> xarray.Dataset:
     # do data processing on the time series.
-
-    #if mslp_vars is not None:
-    #    my_logger.info('Special processing enabled. ')
-    #    ts = ts.merge(ts[mslp_vars].map(mslp_process))  # apply special processing to each variable
-
 
 
     resamp = ts.resample(time='YS-JAN')

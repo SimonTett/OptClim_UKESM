@@ -1,0 +1,15 @@
+# setup env for archer2
+module load PrgEnv-gnu
+module load cray-python/3.10.10 # make sure have base python
+# create python venv as follows:
+# python -m venv --system-site-packages Opt_UKESM
+
+# work out where this script is and add paths relative to it
+pth=$(readlink -f "${BASH_SOURCE[0]}")
+export OPT_UKESM_ROOT=$( dirname -- "${pth}")
+echo "OPT_UKESM_ROOT: ${OPT_UKESM_ROOT}"
+source $OPT_UKESM_ROOT/Opt_UKESM/bin/activate
+export PATH=$OPT_UKESM_ROOT/processing:$PATH
+export PYTHONPATH=$OPT_UKESM_ROOT:$PYTHONPATH
+
+
