@@ -1,0 +1,21 @@
+{
+    "_comment":"Options for post-processing. Generates t/s from model runs. Broadly anything with null values will get default values given by the script. See script for details",
+    "mask_file": "$OPT_UKESM_ROOT/post_process/land_frac.nc",
+    "mask_file_comment": "Path for landfrac file.",
+    "mask_variable":"field36",
+    "mask_variable_comment":"Variable name for the mask field",
+    "mask_fraction": 0.5,
+    "mask_fraction_comment": "Critical Fraction. Specify if mask  is a land/sea fraction. Values >= are land Values < sea. Set to null if mask is a t/f mask",
+    "time_range":["1979-01","2014-12"],
+    "time_range_comment": "Start & end time as ISO std string or null for no start or end. ",
+    "timeseries":true,
+    "timeseries_comment":"If true post processing code will write timeseries out",
+    "file_pattern": "*Z.nc",
+    "file_pattern_comment": "File pattern to match for post-processing. Normal glob rules ",
+    "exclude_vars":null,
+    "exclude_vars_comment":"List of variables to exclude",
+    "log_level": "DEBUG",
+    "log_level_comment": "Level for logging",
+    "overwrite": flase,
+    "overwrite_comment":"Set true to allow overwritting of existing files"
+}
