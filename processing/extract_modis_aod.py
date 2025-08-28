@@ -50,18 +50,10 @@ parser.add_argument('--log_level', type=str, default='INFO',
 args = parser.parse_args()
 UKESMlib.init_log(my_logger, level=args.log_level)
 if (not args.overwrite) and args.output.exists():
-    raise FileExistsError(f"Output file {args.output} already exists. Use --overwrite to overwrite it.")
+    my_logger.warning(f"Output file {args.output} already exists. Use --overwrite to overwrite it.")
+    exit(0)
 
 aod=[extract_modis_aod(f) for f in sorted(args.input_files)]
 aod = xarray.concat(aod, dim='time')
 aod.to_netcdf(args.output) # and save the file
-my_logger.info('Wrote data to {args.outut}')
-## lets make a plot
-import matplotlib.pyplot as plt
-import cartopy.crs as ccrs
-fig = plt.figure(figsize=(10, 5),num='modis_aod_plot',clear=True)
-ax = fig.add_subplot(111,projection=ccrs.PlateCarree())
-aod.mean('time').plot(ax=ax, transform=ccrs.PlateCarree(), cmap='viridis', vmin=0, vmax=1)
-ax.set_title('MODIS AOD 550 nm')
-ax.coastlines()
-plt.show()
+my_logger.info(f'Wrote data to {args.outut}')

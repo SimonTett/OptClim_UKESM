@@ -226,10 +226,22 @@ def main():
                         help='Latitude range to use for processing. If not provided, all latitudes will be used.')
     args = parser.parse_args()
     my_logger = UKESMlib.setup_logging(rootname='comp_regional_ts',level = args.log_level)
+
+    if (not args.overwrite) and args.output_file.exists():
+        my_logger.warning(f'File {args.output_file} exists. Set --overwrite to overwrite it')
+        exit(0)
+
     input_files = []
     for file in args.input_files:
-        input_files += [f for f in glob.glob(file)]  # expand wildcards
+        expand_file = list(glob.glob(file))
+        if len(expand_file) == 0:
+            my_logger.warning(f"No file found from globbing {file}")
+            continue
+        input_files +=expand_file  # expand wildcards
+
     # check all input files exist
+    if len(input_files) == 0:
+        raise FileNotFoundError(f'No files found. Check args.input_files = {args.input_files}')
     missing_files = False
     for file in input_files:
         if not pathlib.Path(file).exists():
@@ -242,10 +254,6 @@ def main():
 
     # Set up logging
 
-
-    if (not args.overwrite) and args.output_file.exists():
-        my_logger.warning(f'File {args.output_file} exists. Set --overwrite to overwrite it')
-        exit(0)
     rename_vars = args.rename
     if rename_vars is not None:
         rename_vars = dict([p for p in pair.split(':')] for pair in rename_vars)  # convert to dict

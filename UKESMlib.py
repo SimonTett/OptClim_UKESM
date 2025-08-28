@@ -170,7 +170,7 @@ def run_command(cmd_input: list):
 
             cmd2.append(c2)
         my_logger.warning(f"Command {' '.join(cmd2)} failed with return code {result.returncode}")
-        breakpoint()
+
 
 
     return result

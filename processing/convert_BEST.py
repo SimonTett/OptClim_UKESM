@@ -9,6 +9,7 @@ import logging
 import pathlib
 import xarray
 import cftime
+import sys
 my_logger = logging.getLogger(__name__)
 parser = argparse.ArgumentParser(description="""Process BEST data to fix netcdf issues and convert to absolute temperatures.
 """)
@@ -29,7 +30,8 @@ else:
     output_file = args.output_file
 
 if output_file.exists() and not args.overwrite:
-    raise ValueError(f"Output file {output_file} already exists. Use --overwrite to overwrite it.")
+    my_logger.warning(f"Output file {output_file} already exists. Use --overwrite to overwrite it.")
+    sys.exit(0)
 # Convert BEST data to absolute temperatures
 
 

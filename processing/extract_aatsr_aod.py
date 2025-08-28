@@ -45,7 +45,8 @@ parser.add_argument('--log_level', type=str, default='INFO',
 args = parser.parse_args()
 UKESMlib.init_log(my_logger, level=args.log_level)
 if (not args.overwrite) and args.output.exists():
-    raise FileExistsError(f"Output file {args.output} already exists. Use --overwrite to overwrite it.")
+    my_logger.warning(f"Output file {args.output} already exists. Use --overwrite to overwrite it.")
+    exit(0)
 # generate the files by expanding the inputs.
 files=[]
 for file in args.input_files:

@@ -65,6 +65,7 @@ def run_command(cmd_input: list):
         breakpoint()
 
 
+
     return result
 preprocess= True
 # Set environment variables
@@ -77,12 +78,12 @@ OPT_UKESM_ROOT = pathlib.Path(
                               )
 os.environ['OPT_UKESM_ROOT'] = str(OPT_UKESM_ROOT)  # Set the environment variable for later use
 data_dir = base_dir / 'obs_data'
-ts_dir = UKESMlib.process_dir/'ts_data'
+ts_dir = UKESMlib.process_dir/'ts_obs_data'
 os.makedirs(ts_dir, exist_ok=True)
 
 sat_cld_vars = ["Cloud_Particle_Size_Liquid","Cloud_Retrieval_Fraction_Liquid","Cloud_Top_Pressure"] # variables watned from MODIS and AATSR
 sat_rename = ["Cloud_Particle_Size_Liquid:Reff", "Cloud_Retrieval_Fraction_Liquid:CLDliq","Cloud_Top_Pressure:CTP"]
-cmd_root = ['comp_regional_ts.py','--land_sea_file', OPT_UKESM_ROOT/"post_process/land_frac.nc", '--nooverwrite', '--output_file']
+cmd_root = ['comp_regional_ts.py','--land_sea_file', OPT_UKESM_ROOT/"post_process/land_frac.nc", '--no-overwrite', '--output_file']
 
 
 
@@ -94,12 +95,12 @@ if preprocess:
     result = run_command(['convert_BEST.py', f"{data_dir}/BEST/Complete_TAVG_LatLong1.nc"]) # Run convert_BEST.py
 
     my_logger.info('Extracting MODIS AOD data')
-    result = run_command(['extract_modis_aod.py', f"{data_dir}/modis_aerosol/*/*/*.hdf",
-                         '--output', f"{data_dir}/modis_aersol_extract.nc"])  # Run extract_modis_aod.py
+    files = sorted((data_dir/"modis_aerosol/MYD08_M3").rglob('*.hdf'))
+    result = run_command(['extract_modis_aod.py','--output', f"{data_dir}/modis_aerosol_extract.nc"]+files)  # Run extract_modis_aod.py
 
     my_logger.info('Extracting AATSR AOD data')
-    result = run_command(['extract_aatsr_aod.py', "/neodc/esacci/aerosol/data/AATSR_SU/L3/v4.3/MONTHLY/*/*.nc",
-                         '--output', f"{data_dir}/AATSR_aerosol_extract.nc"])  # Run extract_aatsr_aod.py
+    files = sorted(pathlib.Path("/neodc/esacci/aerosol/data/AATSR_SU/L3/v4.3/MONTHLY").rglob('*.nc'))
+    result = run_command(['extract_aatsr_aod.py', '--output', f"{data_dir}/AATSR_aerosol_extract.nc"]+files)  # Run extract_aatsr_aod.py
 
 
 # Modis cloud
@@ -109,12 +110,16 @@ cmd = cmd_root+ [f'{ts_dir}/modis_cloud_ts.nc', f'{data_dir}/modis_cloud_extract
 result = run_command(cmd)
 
 # modis aerosol
-cmd = cmd_root+ [f'{ts_dir}/modis_aerosol_ts.nc', f'{data_dir}/modis_aerosol_extract.nc']+ \
-    ['--longitude_range', '-55', '55']
+cmd = cmd_root+ [f'{ts_dir}/modis_aerosol_ts.nc',
+                 '--latitude_range', '-55', '55',
+                 f'{data_dir}/modis_aerosol_extract.nc']
 
+
+
+result = run_command(cmd)
 
 # AATSR cloud
-cmd = cmd_root + [f'{ts_dir}/aatsr_cloud_ts.nc', f'{data_dir}/AATSR_cloud_extract/*.nc'] + \
+cmd = cmd_root + [f'{ts_dir}/aatsr_cloud_ts.nc', f'{data_dir}/aatsr_cloud_extract/*.nc'] + \
     ['--variables'] + sat_cld_vars + ['--rename'] + sat_rename
 
 result = run_command(cmd)
@@ -122,7 +127,7 @@ result = run_command(cmd)
 # AATSR aerosol.
 
 cmd = cmd_root + [f'{ts_dir}/aatsr_aerosol_ts.nc', f'{data_dir}/AATSR_aerosol_extract.nc'] + \
-    ['--longitude_range', '-55', '55', '--variables', 'AOD_550']
+    ['--latitude_range', '-55', '55', '--variables', 'AOD_550']
 result = run_command(cmd)
 
     

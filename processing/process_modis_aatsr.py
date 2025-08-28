@@ -11,6 +11,7 @@ import logging
 import numpy as np
 import argparse
 import UKESMlib
+import sys
 
 my_logger = logging.getLogger(__name__)
 if my_logger.hasHandlers():
@@ -106,6 +107,12 @@ extract_aatsr_dir = base_dir / "aatsr_cloud_extract"
 for dir in [extract_modis_dir, extract_aatsr_dir]:
     dir.mkdir(parents=True, exist_ok=True)  # Create directories if they do not exist
 
+# if all files are present we can skip processing
+all_present = all([(extract_modis_dir/f'{key}.nc').exists() and (extract_aatsr_dir/f'{key}.nc').exists() for key in match_dir.keys()])
+if all_present and not args.overwrite:
+    my_logger.warning('All output files exist and overwrite not set')
+    sys.exit(0)
+    
 modis_files = sorted(modis_dir.glob("MCD06COSP_M3_MODIS.A*.062.2022*.nc"))
 my_logger.info(f'Will be processing {len(modis_files)} modis files')
 aatsr_files = sorted(
