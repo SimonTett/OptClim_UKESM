@@ -12,32 +12,51 @@ import pandas as pd
 import iris
 import re
 my_logger = logging.getLogger('UKESM')
+def expand(path: typing.Optional[pathlib.Path|str]) -> typing.Optional[pathlib.Path]:
+    """
 
-## work out base-dirs for data depening on machine
+    Expand any env vars, convert to path and then expand any user constructs.
+    :param path: path like string or path. If Noen will return None
+    :return:expanded path
+    """
+    if path is None:
+        return None
+    path = os.path.expandvars(path)
+    path = pathlib.Path(path).expanduser()
+    return path
+
+# set up OPT_UKESM_ROOT if it is not already setup based on path to this file.
+if os.environ.get('OPT_UKESM_ROOT') is None:
+    os.environ['OPT_UKESM_ROOT'] = str(pathlib.Path(__file__).absolute().parent)
+    my_logger.warning(f"OPT_UKESM_ROOT not set. Setting to {os.environ['OPT_UKESM_ROOT']}")
+## work out base-dirs for data depending on machine
 host = socket.gethostname()
 on_jasmin =re.match(r'sci-vm-0\d.jasmin.ac.uk',host)
-try:
-    base_dir = pathlib.Path(os.getenv('BASE_DIR'))
-except TypeError as e: # failed coz BASE_DIR does not exist
+base_dir = expand(os.getenv('OPT_UKESM_BASE_DIR'))
+if base_dir is None: # need ot setup base_dir
     my_logger.warning('BASE_DIR not in env')
     if host.startswith('GEOS-W'):  # Geos windows desktop
         base_dir = pathlib.Path(r"P:\optclim_data")
     elif on_jasmin:
         base_dir=pathlib.Path('gws/nopw/j04/terrafirma/tetts/data')
-
     else:
         my_logger.warning('Do not know how to define base_dir.  Define BASE_DIR or modify code')
+    if base_dir is not None:
+        my_logger.info(f'Setting BASE_DIR to {base_dir}')
+        os.environ['OPT_UKESM_BASE_DIR'] = str(base_dir)
 
-try:
-    process_dir = pathlib.Path(os.getenv('PROCESS_DIR'))
-except TypeError as e:  # failed coz PROCESS_DIR does not exist
+process_dir = expand(os.getenv('OPT_UKESM_PROCESS_DIR'))
+if process_dir is None: # need to setup process_dir
     my_logger.warning('PROCESS_DIR not in env')
-    if host.startswith('GEOS-W') or host.startswith('GEOS_L'):  # Geos windows dekstop or laptop
+    if host.startswith('GEOS-W') or host.startswith('GEOS_L'):  # Geos windows desktop or laptop
         process_dir = pathlib.Path(r"C:\Users\stett2\OneDrive - University of Edinburgh\data\Opt_UKESM1")
     elif on_jasmin:
         process_dir = base_dir/'processing'
     else:
         my_logger.warning('Do not know how to define process_dir.  Define PROCESS_DIR or modify code')
+    if process_dir is not None:
+        my_logger.info(f'Setting PROCESS_DIR to {process_dir}')
+        os.environ['OPT_UKESM_PROCESS_DIR'] = str(process_dir)
 
 
 def setup_logging(level: typing.Optional[typing.Union[int, str]] = None,
@@ -170,6 +189,7 @@ def run_command(cmd_input: list):
 
             cmd2.append(c2)
         my_logger.warning(f"Command {' '.join(cmd2)} failed with return code {result.returncode}")
+        raise ValueError("failed to run command")
 
 
 
@@ -345,21 +365,36 @@ def mslp_process(ts: xarray.DataArray) -> xarray.DataArray:
 
 
     return result
-def process(ts:xarray.Dataset,
-            ) -> xarray.Dataset:
+def guess_region_coord(da: xarray.DataArray,
+                       time_coord:str='time') -> typing.Optional[str]:
+    """
+    Guess the name of the region coordinate in a DataArray.
+    Assumes that the region coordinate is the only non-time dimension that contains 'region' in its name.
+
+    :param da: DataArray to inspect
+    :param time_coord: time coordinate name (default is 'time')
+    :return: guess at region coordinate name or None if not found.
+    """
+    non_time_dims = set(da.dims) - set([time_coord])
+    region_coord = next((d for d in non_time_dims if 'region' in d.lower()), None)
+    my_logger.debug(f' region coord for {da.name} is {region_coord}')
+    return region_coord
+
+def process(ts:xarray.DataArray) -> xarray.DataArray:
     # do data processing on the time series.
 
-
-    resamp = ts.resample(time='YS-JAN')
+    time_coord='time'
+    resamp = ts.resample({time_coord:'YS-JAN'})
     mean = resamp.mean().where(resamp.count() == 12)  # compute annual means where there are 12 months of data
     #mean = mean.dropna('time').drop_dims('nbounds', errors='ignore')
-    mean = mean.dropna('time')
+    result = mean.dropna(time_coord)
+    region_coord = guess_region_coord(result,time_coord)
     # add in  seasonal cycle.
     try:
         ts_delta = seasonal_cycle(ts, 'jja') - seasonal_cycle(ts, 'djf')
-        rgn_names = {r:r+'_'+'seas' for r in ts_delta.coords['region'].values}
-        ts_delta= ts_delta.assign_coords(region = [rgn_names.get(r,r) for r in ts.coords['region'].values])
-        result = xarray.concat([mean, ts_delta], dim='region').load()
+        new_coords={region_coord:[r+'_'+'seas' for r in ts_delta.coords[region_coord].values]}
+        ts_delta= ts_delta.drop_vars(region_coord).assign_coords(new_coords)
+        result = xarray.concat([result, ts_delta], dim=region_coord).load()
     except TypeError: # catch nones coming back
         my_logger.warning(f'Problem computing seasonal means for {ts.name}')
     return result
@@ -440,3 +475,5 @@ def um_cubes(files:typing.Union[list[str],str],
     cubes = combine_cubes(cubes_f)
     my_logger.debug(f'Combined to {len(cubes)} cubes')
     return cubes
+
+

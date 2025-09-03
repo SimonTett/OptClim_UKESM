@@ -38,8 +38,9 @@ import warnings # so we can supress iris warnings...
 warnings.simplefilter(action='ignore', category=FutureWarning)
 warnings.filterwarnings('ignore', category=RuntimeWarning,
                         message='invalid value encountered in divide')
-# liust of wanted stash
+# list of wanted stash
 wanted_stash=[
+                  'm01s01i245','m01s01i246', # microphysics Reff and weighting
                   'm01s02i330', # COSP weighting
                   'm01s02i451','m01s02i452','m01s02i453', # tot cld, liq cld, ice_cld
                   'm01s02i463', 'm01s02i464', # Reff liq & ice.
@@ -314,6 +315,7 @@ def genProcess(dataset:xarray.Dataset,
     """
     Setup the processing information
     :param dataset: the dataset containing the data
+    :param exclude_vars: list of variable names to exclude from processing
     :return: dict containing data to be processed.
     """
     # create long & standard name lookup
@@ -377,7 +379,18 @@ def genProcess(dataset:xarray.Dataset,
                 return None
         return var
 
-    def modis_fn(stash,name,scale=None):
+    def unweight(stash:str,name:str,scale=None,
+                 wt_code:str='m01s02i330',
+                 close_to_zero:float=1e-5) -> typing.Optional[xarray.DataArray]:
+        """
+        Compute the  diagnostics by unweighting them. Intended for MODIS diagnostics
+        :param stash: stash code wanted
+        :param name: name to give the result
+        :param scale: Scaling to apply to the result
+        :param wt_code: stash code for weighting. Default is COSP MODIS weight
+        :param close_to_zero: value below which weight is considered to be zero
+        :return: unweighted values or None if data not found
+        """
         # codes are
         # 'm01s02i463' liquid Reff
         # 'm01s02i464' ice  Reff
@@ -385,12 +398,12 @@ def genProcess(dataset:xarray.Dataset,
         # 'm01s02i452' liquid cloud fraction
         # 'm01s02i453' ice cloud fraction
         # 'm01s02i465' COSP MODIS ctp
-        modis_wt = name_fn('m01s02i330',name_type='stash') # COSP MODIS weight
-        modis_wt_value = name_fn(stash,name_type='stash') # COSP cld weighted value
-        if (modis_wt_value is None) or (modis_wt is None):
-            my_logger.warning(f"Failed to find modis_wt_value or modis_wt for {name} using stash {stash}")
+        wt = name_fn(wt_code,name_type='stash') # weight
+        wt_value = name_fn(stash,name_type='stash') # weighted values
+        if (wt_value is None) or (wt is None):
+            my_logger.warning(f"Failed to find wt_value or wt for {name} using stash {stash}")
             return None
-        result = modis_wt_value.where(modis_wt > 1e-5) / modis_wt  # compute the effective radius
+        result = wt_value.where(wt > close_to_zero) / wt  # compute the effective radius
         result = result.rename(name)  # rename the result
         if scale is not None:
             result = result * scale
@@ -453,6 +466,7 @@ def genProcess(dataset:xarray.Dataset,
     if mass is not None: # convert to mass/m^2
         area = cell_area(mass)
         mass /= area # convert to per m^2
+
     AOD_range = slice(-55,55) # want between +/- 55). Hopefully enough sunshine there
     land_range = slice(-60,None) 
     process = {
@@ -465,12 +479,16 @@ def genProcess(dataset:xarray.Dataset,
         'Precip': name_fn('precipitation_flux',name_type='standard',
                           latitude=land_range),
         'MSLP': name_fn('air_pressure_at_sea_level',name_type='standard'),
-        'Reff': modis_fn('m01s02i463','Reff'),
-        'ReffIce': modis_fn('m01s02i464','ReffIce'),
-        'CLDtot': modis_fn('m01s02i451','CLDtot'),
-        'CLDliq': modis_fn('m01s02i452','CLDliq'),
-        'CLDice': modis_fn('m01s02i453','CLDice'),
-        'CTP': modis_fn('m01s02i465','CTP',scale=1e-2),
+        'Reff': unweight('m01s02i463','Reff',wt_code='m01s02i452'), # COSP diagnostic so takes account of satellite sampling
+        'ReffIce': unweight('m01s02i464','ReffIce',wt_code='m01s02i453'), # ditto
+
+        'CLDtot': unweight('m01s02i451','CLDtot'),
+        'CLDliq': unweight('m01s02i452','CLDliq'),
+        'CLDice': unweight('m01s02i453','CLDice'),
+        'CTP': unweight('m01s02i465','CTP',wt_code='m01s02i451'), # leave in Pa.
+        # 'Microphysics as opposed to COSP values. COSP is what satellites would see.
+        'Reff_microphysics': unweight('m01s01i245', 'Reff_microphysics', wt_code='m01s01i246', scale=1e-6),
+        # convert to SI
         'AOD_550': AOD(latitude=AOD_range),
         'Dust_AOD_550': name_fn('m01s02i285',name_type='stash',pseudo_level=pseudolev_550nm,latitude=AOD_range),
         # SO2 related.
@@ -483,12 +501,12 @@ def genProcess(dataset:xarray.Dataset,
         'Trop_LW_net': name_fn('tropopause_net_downward_longwave_flux'),
 
     }
-    # add in total columsn
+    # add in total colummns
     col_names = ['h2so4','nucleation_h2so4','aitkin_h2so4','accum_h2so4','coarse_h2so4','DMS']
     stash_codes = ['m01s34i073','m01s34i102','m01s34i104','m01s34i108','m01s34i114','m01s34i071']
-    
+    mass = mass.compute() # compute it as we will use it a lot!
     for name,stash in zip(col_names,stash_codes):
-        process[name+'_col']= total_column(name_fn(stash,name_type='stash'), mass) # FIXME -- values are -ve
+        process[name+'_col']= total_column(name_fn(stash,name_type='stash'), mass) #
 
     # deal with T and rh values
     coord_500hPa = dict(pressure=500)  # co-ord value for 500 hPa
@@ -546,24 +564,18 @@ def compute_values(files: list[pathlib.Path],
         dataset = read_UMfiles(files)
     elif all([file.suffix in ['.nc','.hdf'] for file in files]):
         my_logger.info(f'Reading netcdf data from {len(files)} files')
-        dataset=[]
-        for file in sorted(files):
-            dataset.append(xarray.open_dataset(file))
-            my_logger.debug(f"Opened  {file}")
-        my_logger.info('Concatenating datasets')
-        dataset = xarray.concat(dataset,dim='time')
-                      
+        dataset = xarray.open_mfdataset(sorted(files),decode_timedelta=False,chunks=dict(time=1))
         my_logger.info(f'Read netcdf data from {len(files)} files')
 
     else:
-        raise ValueError(f'Files inconsisent - {files}')
+        raise ValueError(f'Files inconsistent - {files}')
     if time_range is not None:
         time=" ".join(dataset.time.dt.strftime('%Y-%m-%d').values)
         dataset = dataset.sel(time=slice(*time_range))
         if len(dataset.time) == 0:
             raise ValueError(f'No data in time range {time_range} for times: {time}')
         else:
-            my_logger.info(f'Procesing data for {len(dataset.time)} times')
+            my_logger.info(f'Processing data for {len(dataset.time)} times')
 
     masks = UKESMlib.create_region_masks(land_mask,critical_value=land_mask_fraction)
     process = genProcess(dataset,exclude_vars=exclude_vars)
@@ -576,7 +588,7 @@ def compute_values(files: list[pathlib.Path],
             continue
         da = dataArray.squeeze(drop=True).reset_coords(drop=True)
         lon,lat,_,_ = UKESMlib.guess_coordinate_names(da)
-        da = da.rename({lon:'longitude',lat:'latitude'}) # stadnardise co-ord names
+        da = da.rename({lon:'longitude',lat:'latitude'}) # standardise co-ord names
         regrid = UKESMlib.conservative_regrid(da,land_mask)
         mean = UKESMlib.da_regional_avg(regrid, masks)
         if name in ['MSLP']: # pressure
@@ -710,7 +722,8 @@ def do_work():
             print(f'Default: {key} = {value} Actual:{options[key]}')
         sys.exit(0) # exit the script
     # end of dealing with printing out defaults
-
+    # make the directory for output_file
+    output_file.parent.mkdir(parents=True,exist_ok=True)
     if output_file.exists() and not overwrite:
         raise ValueError(f'Output file {output_file} exists and overwrite set to false')
 
