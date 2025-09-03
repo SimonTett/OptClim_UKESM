@@ -1,0 +1,5 @@
+Place for  miscellaneous code which is not directly used in the optimisation.
+
+Visualisation code and code to check things should go here.
+
+* plot_reff.py -- plots effective radiaus (computed two different ways) and cld top pressure. Used to find error in how weightings were applied.
