@@ -91,6 +91,7 @@ if preprocess:
     my_logger.info('Running process_modis_aatsr.py')
     result = run_command(['process_modis_aatsr.py', data_dir])# Run process_modis_aatsr.py
 
+
     my_logger.info('Running convert_BEST.py')
     result = run_command(['convert_BEST.py', f"{data_dir}/BEST/Complete_TAVG_LatLong1.nc"]) # Run convert_BEST.py
 
@@ -172,7 +173,7 @@ cmd = cmd_root + [ts_dir/'aatsr_toa_flux_ts.nc', data_dir/"AATSR_cloud/*ESACCI-L
 result = run_command(cmd)
 
 # ERA5
-rename_era = "t2m:T2m t:T tp:Precip msl:MSLP  r:RH".split()
+rename_era = "t2m:T2m t:T@500 tp:Precip msl:MSLP  r:RH@500".split()
 variables_era = "t2m t tp msl r".split()  # variables to extract from ERA5
 era5_files = list((data_dir/'ERA5').glob("*.nc"))
 for f in era5_files:

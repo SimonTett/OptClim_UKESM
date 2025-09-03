@@ -85,11 +85,9 @@ def modis_set_time(ds: xarray.Dataset) -> xarray.Dataset:
 base_dir_default = pathlib.Path(r"P:\optclim_data\obs_data")  # do system dependent guess here
 parser = argparse.ArgumentParser(description='Process MODIS and AATSR cloud data.')
 parser.add_argument('base_dir', type=pathlib.Path, help='Base directory for input and output data')
-group = parser.add_mutually_exclusive_group()
-group.add_argument('--overwrite', dest='overwrite', action='store_true', help='Enable overwrite')
-group.add_argument('--nooverwrite', dest='overwrite', action='store_false', help='Disable overwrite')
-parser.set_defaults(overwrite=False)
-args = parser.parse_args()
+parser.add_argument('--overwrite', dest='overwrite', help='Enable overwrite',action=argparse.BooleanOptionalAction,default=False)
+args = parser.parse_args()  # and parse the arguments
+
 
 # variables wanted from MODIS and match in AATSR data.
 match_dir = {'Cloud_Mask_Fraction':'cfc',

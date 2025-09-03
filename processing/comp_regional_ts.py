@@ -21,7 +21,7 @@ import pandas as pd
 import xarray
 import xarray_regrid # regridding in xarray
 import glob
-
+import sys
 import UKESMlib
 
 
@@ -61,6 +61,7 @@ def fix_units(da: xarray.DataArray) -> xarray.DataArray:
     - 'mm/month' to 'kg/sec'
     - 'degrees Celsius' or 'degree C' to Kelvin ('K')
     - 'microns' to meters ('m')
+    - 'mb' or 'mbar' to Pa. 
     """
     attrs = da.attrs
     # Example: Convert units to a standard format if needed
@@ -95,6 +96,11 @@ def fix_units(da: xarray.DataArray) -> xarray.DataArray:
             result = da*1e-6
             result.attrs['units'] = 'm'  # update units to meters
             my_logger.info(f"Converting from microns to m for {da.name}")
+        elif unit in ['mb','mbar','hPa']: # convert to Pa
+            result = da*100.
+            result.attrs['units']='Pa'
+            my_logger.info(f'Converting from {unit} to Pa')
+        
         else:
                return da # nothing to do.
     return result
@@ -229,7 +235,7 @@ def main():
 
     if (not args.overwrite) and args.output_file.exists():
         my_logger.warning(f'File {args.output_file} exists. Set --overwrite to overwrite it')
-        exit(0)
+        sys.exit(0)
 
     input_files = []
     for file in args.input_files:

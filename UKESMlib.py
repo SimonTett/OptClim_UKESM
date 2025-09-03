@@ -278,7 +278,7 @@ def da_regional_avg(da:xarray.DataArray,masks: dict[str, xarray.DataArray]) -> x
     lon_name, lat_name, _,time_name = guess_coordinate_names(da)
     for region_name, mask in masks.items():
         masked_var = da.where(mask)
-        mn = masked_var.weighted(area_weights.where(mask,0.0)).mean(dim=[lon_name, lat_name], skipna=True).squeeze(drop=True)
+        mn = masked_var.weighted(area_weights.where(mask,0.0)).mean(dim=[lon_name, lat_name], skipna=True)#.squeeze(drop=True)
         mn = mn.expand_dims(region=[region_name])
         mn = mn.load()  # force dask to compute this.
         result.append(mn)
