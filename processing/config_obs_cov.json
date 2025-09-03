@@ -1,0 +1,69 @@
+{
+  "_comment": "Configuration file for simulation with covariance matrix. See script for details and defaults",
+  "process": true,
+  "process_comment": "Data needs processing",
+  "block": true,
+  "block_comment": "If true then each variable is assumed independent",
+  "cov_file": "$OPT_UKESM_ROOT/covariance/obserr.csv",
+  "cov_file_comment": "Path for obs error covariance file. If null then use default value",
+  "cov_time": ["2001-01","2020-12"],
+  "cov_time_comment": "Start & end time as ISO std string or null for no start or end. ",
+  "location_file": "$OPT_UKESM_ROOT/configs/target2011.json",
+  "location_file_comment": "Path for location file. In this case is target obs for calibration",
+  "location_time": ["2011-01","2011-12"],
+  "location_time_comment": "Start & end time as ISO std string or null for no start or end. ",
+  "metadata_file": "$OPT_UKESM_ROOT/configs/obs_metadata.json",
+  "metadata_file_comment": "Path for metadata file. ",
+  "exclude_variables": [
+    "Dust_AOD_550",
+    "CLDice",
+    "T@50",
+    "RH@50",
+    "ReffIce",
+    "CLDtot",
+    "INSW",
+    "SO2_col"
+  ],
+  "exclude_vars_comment": "List of variables to exclude. ",
+  "mslp_vars": ["MSLP"],
+  "mslp_vars_comment": "Variables to use as MSLP based regions",
+  "regions": ["NHX","T","SHX","NHX_L_seas"],
+  "regions_comment": "Std List of regions to process.",
+  "special_regions": {
+    "MSLP": [
+      "NHX_DGM",
+      "T_DGM",
+      "NHX_L_DGM_seas"
+    ],
+    "T2m": [
+      "NHX_L",
+      "T_L",
+      "NHX_L_seas"
+    ],
+    "Precip": [
+      "NHX_L",
+      "T_L",
+      "NHX_L_seas"
+    ],
+    "netflux": [
+      "global"
+    ]
+  },
+    "special_regions_comment": "Special regions for specific variables. If a region is not listed here it will use the default regions.",
+  "scales": {
+    "Precip": 86400.0,
+    "AOD_550": 100.0,
+    "Reff": 1e6,
+    "MSLP": 1e-2,
+    "CLDliq": 100.0,
+    "CTP": 1e-2
+  },
+  "scales_comment": "Scaling factors for specific variables. If a variable is not listed here it will not be scaled. Precip-> mm/day, AOD -> x100, Reff -> microns, MSLP -> hPa, CLDliq -> percent, CTP -> hPa",
+  "levels": {
+    "T": 500,
+    "RH": 500
+  },
+  "levels_comment": "Levels to use for specific variables. If a variable is not listed here it will use all levels (i.e. no level selection).",
+  "override_cov":{"netflux_global": 1e-2},
+  "override_cov_comment":"Override specific covariance values with SI values given here."
+}

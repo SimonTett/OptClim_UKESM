@@ -1,5 +1,5 @@
 {
-    "_comment":"Options for post-processing. Generates t/s from model runs. Broadly anything with null values will get default values given by the script. See script for details",
+    "_comment":"Options for post-processing. Generates t/s from model runs. Broadly anything with null values will get default values given by the script. See script for details and defaults",
     "mask_file": "$OPT_UKESM_ROOT/post_process/land_frac.nc",
     "mask_file_comment": "Path for landfrac file.",
     "mask_variable":"field36",
@@ -12,10 +12,10 @@
     "timeseries_comment":"If true post processing code will write timeseries out",
     "file_pattern": "*Z.nc",
     "file_pattern_comment": "File pattern to match for post-processing. Normal glob rules ",
-    "exclude_vars":null,
-    "exclude_vars_comment":"List of variables to exclude",
+    "exclude_vars":["SO2_col","h2so4_col","nucleation_h2so4_col","aitkin_h2so4_col","accum_h2so4_col","coarse_h2so4_col","DMS_col"],
+    "exclude_vars_comment":"List of variables to exclude. Removing all column vars as very slow and no obs to compare with -- takes ~ 80 times longer than single levels",
     "log_level": "DEBUG",
     "log_level_comment": "Level for logging",
-    "overwrite": flase,
-    "overwrite_comment":"Set true to allow overwritting of existing files"
+    "overwrite": false,
+    "overwrite_comment":"Set true to allow overwriting of existing files"
 }
