@@ -1,6 +1,8 @@
 {
     "_comment":"list of stash codes and sampling periods to select",
     "stash":[
+	"m01s01i245",
+	"m01s01i246",
         "m01s02i330", 
         "m01s02i451",
 	"m01s02i452",

@@ -52,7 +52,7 @@ UKESMlib.setup_logging(args.log_level)
 UKESMlib.my_logger.info(f'Reading data from {len(args.FILES)} files')
 # log the config
 for k,v in config.items():
-    UKESMlib.my_logger.info(f'{k}:{v}')
+    UKESMlib.my_logger.debug(f'{k}:{v}')
 
 
 if config.get('stash') is None and config.get('samples') is None:
@@ -69,7 +69,7 @@ if output.suffix != '.nc':
 if output.exists() and not config.get("overwrite",False):
     UKESMlib.my_logger.info(f'Exiting as output file {output} exists.')
     raise ValueError(f'{output} exists and overwrite is not set')
-UKESMlib.my_logger.info(f'Reading data from {args.FILES}')
+UKESMlib.my_logger.debug(f'Reading data from {args.FILES}')
 cubes = UKESMlib.um_cubes(args.FILES,stash_codes=config.get('stash'),intervals=config.get('samples')) # extract data
 cubes.realise_data() # force the load as can get hdf error if write when not loaded... 
 UKESMlib.my_logger.info(f'Writing data to {output}')

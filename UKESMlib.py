@@ -453,7 +453,7 @@ def um_cubes(files:typing.Union[list[str],str],
     
     cubes_f = []
     for file in files:
-        my_logger.debug(f'Reading from {file}')
+        my_logger.info(f'Reading from {file}')
         fields = list(load(file))
         if inspect: # print everything out
             counts = count_fields(fields)
