@@ -593,6 +593,7 @@ def compute_values(files: list[pathlib.Path],
         mean = UKESMlib.da_regional_avg(regrid, masks)
         if name in ['MSLP']: # pressure
             mean = UKESMlib.mslp_process(mean)
+            name = 'MSLP_DGM' # change name to indicate difference from global mean
 
 
             

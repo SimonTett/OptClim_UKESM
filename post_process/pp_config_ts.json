@@ -5,7 +5,7 @@
     "mask_variable":"field36",
     "mask_variable_comment":"Variable name for the mask field",
     "mask_fraction": 0.5,
-    "mask_fraction_comment": "Critical Fraction. Specify if mask  is a land/sea fraction. Values >= are land Values < sea. Set to null if mask is a t/f mask",
+    "mask_fraction_comment": "Critical Fraction. Specify if mask  is a land/sea fraction. Values >= are land Values values < sea. Set to null if mask is a t/f mask",
     "time_range":null,
     "time_range_comment": "Start & end time as ISO std string or null for no start or end. ",
     "timeseries":true,
@@ -16,6 +16,6 @@
     "exclude_vars_comment":"List of variables to exclude. Removing all column vars as very slow and no obs to compare with -- takes ~ 80 times longer than single levels",
     "log_level": "INFO",
     "log_level_comment": "Level for logging",
-    "overwrite": true,
+    "overwrite": false,
     "overwrite_comment":"Set true to allow overwriting of existing files"
 }
