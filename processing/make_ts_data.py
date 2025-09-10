@@ -131,12 +131,10 @@ cmd = cmd_root + [f'{ts_dir}/aatsr_aerosol_ts.nc', f'{data_dir}/AATSR_aerosol_ex
     ['--latitude_range', '-55', '55', '--variables', 'AOD_550']
 result = run_command(cmd)
 
-    
-
 
 # CRU_TS temp
-cmd = cmd_root+[f'{ts_dir}/CRU_TS_tmn_ts.nc', f'{data_dir}/CRU_TS/cru_ts4.09.2*.tmn.dat.nc',
-                '--variables','tmn', '--rename','tmn:T2m']
+cmd = cmd_root+[f'{ts_dir}/CRU_TS_tmp_ts.nc', '/badc/cru/data/cru_ts/cru_ts_4.09/data/tmp/*4.09.2*.tmp.*nc.gz',
+                '--variables','tmp', '--rename','tmp:T2m'] # mean CRU temp -- on jasmin so using badc path
 result = run_command(cmd)
 
 # CRU_TS precip
