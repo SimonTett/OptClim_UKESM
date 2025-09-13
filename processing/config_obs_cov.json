@@ -1,5 +1,9 @@
 {
   "_comment": "Configuration file for simulation with covariance matrix. See script for details and defaults",
+  "files":  ["$OPT_UKESM_PROCESS_DIR/ts_obs_data/*.nc"],
+  "files_comment": "Glob expression for files to process",
+  "log_level": "INFO",
+  "log_level_comment": "Default logging level",
   "process": true,
   "process_comment": "Data needs processing",
   "block": true,
@@ -8,12 +12,14 @@
   "cov_file_comment": "Path for obs error covariance file. If null then use default value",
   "cov_time": ["2001-01","2020-12"],
   "cov_time_comment": "Start & end time as ISO std string or null for no start or end. ",
-  "location_file": "$OPT_UKESM_ROOT/configs/target2011.json",
+  "location_file": "$OPT_UKESM_ROOT/configs/target_2011.ijson",
   "location_file_comment": "Path for location file. In this case is target obs for calibration",
   "location_time": ["2011-01","2011-12"],
   "location_time_comment": "Start & end time as ISO std string or null for no start or end. ",
   "metadata_file": "$OPT_UKESM_ROOT/configs/obs_metadata.json",
   "metadata_file_comment": "Path for metadata file. ",
+  "variables_file": "$OPT_UKESM_ROOT/configs/obs_variables.ijson",
+  "variables_file_comment": "Path for variable file. ",
   "exclude_variables": [
     "Dust_AOD_550",
     "CLDice",
@@ -25,15 +31,20 @@
     "SO2_col"
   ],
   "exclude_vars_comment": "List of variables to exclude. ",
+  "exclude_vars_files": {
+    "T2m": ["ERA5_sfc_t_mslp_1979_2024_ts.nc"],
+    "Precip" : ["ERA5_total_precip_1979_2024_ts.nc"]
+  },
+  "exclude_vars_files_comment": "list of variables in file **names** to exclude. Don't want ERA5 temp & precip.",
   "mslp_vars": ["MSLP"],
-  "mslp_vars_comment": "Variables to use as MSLP based regions",
+  "mslp_vars_comment": "Variables that are  MSLP and need conversion",
   "regions": ["NHX","T","SHX","NHX_L_seas"],
   "regions_comment": "Std List of regions to process.",
   "special_regions": {
-    "MSLP": [
-      "NHX_DGM",
-      "T_DGM",
-      "NHX_L_DGM_seas"
+    "MSLP_DGM": [
+      "NHX",
+      "T",
+      "NHX_seas"
     ],
     "T2m": [
       "NHX_L",
@@ -43,6 +54,7 @@
     "Precip": [
       "NHX_L",
       "T_L",
+      "T_L_seas",
       "NHX_L_seas"
     ],
     "netflux": [
@@ -54,7 +66,7 @@
     "Precip": 86400.0,
     "AOD_550": 100.0,
     "Reff": 1e6,
-    "MSLP": 1e-2,
+    "MSLP_DGM": 1e-2,
     "CLDliq": 100.0,
     "CTP": 1e-2
   },
@@ -65,5 +77,7 @@
   },
   "levels_comment": "Levels to use for specific variables. If a variable is not listed here it will use all levels (i.e. no level selection).",
   "override_cov":{"netflux_global": 1e-2},
-  "override_cov_comment":"Override specific covariance values with SI values given here."
+  "override_cov_comment":"Override specific covariance values with SI values given here.",
+  "override_loc": {"Cess": 2.0},
+  "override_loc_comment": "Override location values for specific variables.  Cess value is a climate sens of cira 2K."
 }

@@ -1,5 +1,6 @@
 # so have python env then do source processing/extract_um_data.sh
 # give it at least two arguments -- directory to process and where you want output to go.
+# runs on jasmin which is where AMIP data got transfered too.
 
 in_dir=$1 ; shift
 output_dir=$1/$(basename $in_dir) ; shift
