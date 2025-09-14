@@ -11,7 +11,9 @@ import subprocess
 import pandas as pd
 import iris
 import re
+import dotenv
 my_logger = logging.getLogger('UKESM')
+dotenv.load_dotenv() # load environment variables from .env file if present
 def expand(path: typing.Optional[pathlib.Path|str]) -> typing.Optional[pathlib.Path]:
     """
 
@@ -347,10 +349,10 @@ def seasonal_cycle(ts: xarray.Dataset, season: str) -> typing.Optional[xarray.Da
 
 def mslp_process(ts: xarray.DataArray) -> xarray.DataArray:
     """
-    Special processing for specific datasets.
-    Handles SLP for now.
+
     :param ts: xarray Dataset to process.
-    :return: processed xarray Dataset.
+    :return: timeseries with all non-global values being converted to differences against the global mean.
+    The global mean is retained as is. The variable name has _DGM appended to it.
     """
 
     if str(ts.name).lower() not in  ['slp','mslp','mean_sea_level_pressure','air_pressure_at_sea_level']:
@@ -358,10 +360,10 @@ def mslp_process(ts: xarray.DataArray) -> xarray.DataArray:
     my_logger.info(f'Processing SLP variable {ts.name} to convert to difference from global mean.')
     # remove the global mean and add_delta to the region names.
     result = (ts-ts.sel(region='global').squeeze(drop=True)).where(ts.region != 'global', drop=True)
-    region_names = [r+'_DGM' for r in result.coords['region'].values ]
-    result = result.assign_coords(region=region_names)  # rename the regions
     # add back in the global-average.
     result = xarray.concat([result,ts.sel(region='global')],dim='region')
+    result = result.rename(str(result.name)+'_DGM')
+    result = result.assign_attrs(description=f'difference from global mean for non-global regions')
 
 
     return result
@@ -394,7 +396,7 @@ def process(ts:xarray.DataArray) -> xarray.DataArray:
         ts_delta = seasonal_cycle(ts, 'jja') - seasonal_cycle(ts, 'djf')
         new_coords={region_coord:[r+'_'+'seas' for r in ts_delta.coords[region_coord].values]}
         ts_delta= ts_delta.drop_vars(region_coord).assign_coords(new_coords)
-        result = xarray.concat([result, ts_delta], dim=region_coord).load()
+        result = xarray.concat([result, ts_delta], dim=region_coord,join='outer').load()
     except TypeError: # catch nones coming back
         my_logger.warning(f'Problem computing seasonal means for {ts.name}')
     return result

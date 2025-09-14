@@ -1,0 +1,158 @@
+{
+  "program": "C:\\Users\\stett2\\OneDrive - University of Edinburgh\\Software\\OptClim_UKESM\\processing\\comp_loc_covar.py",
+  "time_run": "2025-09-10:20-37-41Z",
+  "n_variables": 14,
+  "variables": {
+    "OLR": 2,
+    "OLRC": 2,
+    "RSR": 2,
+    "RSRC": 2,
+    "T2m": 2,
+    "Precip": 2,
+    "MSLP_DGM": 2,
+    "Reff": 2,
+    "CLDliq": 2,
+    "CTP": 2,
+    "AOD_550": 2,
+    "T@500": 2,
+    "RH@500": 2,
+    "netflux": 2
+  },
+  "n_files": 2,
+  "files": [
+    "C:\\Users\\stett2\\OneDrive - University of Edinburgh\\data\\Opt_UKESM1\\sim_ts\\dr157_ts.nc",
+    "C:\\Users\\stett2\\OneDrive - University of Edinburgh\\data\\Opt_UKESM1\\sim_ts\\dr873_ts.nc"
+  ],
+  "diagnostics": {
+    "All": [
+      "shrinkage_",
+      0.05605698688758526
+    ]
+  },
+  "options": {
+    "location_file": "C:\\Users\\stett2\\OneDrive - University of Edinburgh\\Software\\OptClim_UKESM\\configs\\std_AMIP_2011.ijson",
+    "cov_file": "C:\\Users\\stett2\\OneDrive - University of Edinburgh\\Software\\OptClim_UKESM\\covariance\\AMIP_intvar.csv",
+    "log_level": "DEBUG",
+    "overwrite": true,
+    "block": false,
+    "print_default": false,
+    "print_variables": true,
+    "process": false,
+    "covariance_estimator": "LedoitWolf",
+    "_comment": "Configuration file for AMIP simulations with covariance matrix. See script for details and defaults",
+    "files": [
+      "C:\\Users\\stett2\\OneDrive - University of Edinburgh\\data\\Opt_UKESM1\\sim_ts\\dr157_ts.nc",
+      "C:\\Users\\stett2\\OneDrive - University of Edinburgh\\data\\Opt_UKESM1\\sim_ts\\dr873_ts.nc"
+    ],
+    "process_comment": "Data already been processed so don't reprocess",
+    "cov_file_comment": "Path for covariance file. If null then use default value",
+    "location_file_comment": "Path for location file. If null then use default value",
+    "metadata_file": "C:\\Users\\stett2\\OneDrive - University of Edinburgh\\Software\\OptClim_UKESM\\configs\\AMIP_metadata.json",
+    "metadata_file_comment": "Path for metadata file. ",
+    "scalings_file": "C:\\Users\\stett2\\OneDrive - University of Edinburgh\\Software\\OptClim_UKESM\\configs\\scalings.ijson",
+    "scalings_file_comment": "Path for scalings file. ",
+    "location_time": [
+      "2011-01",
+      "2011-12"
+    ],
+    "standard_time_comment": "Start & end time as ISO std string or null for no start or end. ",
+    "variables": [
+      "OLR",
+      "RSR",
+      "netflux",
+      "OLRC",
+      "RSRC",
+      "T2m",
+      "Precip",
+      "MSLP_DGM",
+      "T@500",
+      "RH@500",
+      "Reff",
+      "CLDliq",
+      "CTP",
+      "AOD_550"
+    ],
+    "variables_comment": "List of variables to use. If empty use all available. ",
+    "exclude_variables": [
+      "Dust_AOD_550",
+      "CLDice",
+      "T@50",
+      "RH@50",
+      "ReffIce",
+      "CLDtot",
+      "INSW",
+      "SO2_col"
+    ],
+    "exclude_vars_comment": "List of variables to exclude. ",
+    "regions": [
+      "NHX",
+      "T",
+      "SHX",
+      "NHX_L_seas"
+    ],
+    "regions_comment": "Std List of regions to process.",
+    "special_regions": {
+      "MSLP_DGM": [
+        "NHX",
+        "T",
+        "NHX_seas"
+      ],
+      "T2m": [
+        "NHX_L",
+        "T_L",
+        "NHX_L_seas"
+      ],
+      "Precip": [
+        "NHX_L",
+        "T_L",
+        "T_L_seas",
+        "NHX_L_seas"
+      ],
+      "netflux": [
+        "global"
+      ]
+    },
+    "special_regions_comment": "Special regions for specific variables. If a region is not listed here it will use the default regions.",
+    "scales": {
+      "Precip": 86400.0,
+      "AOD_550": 100.0,
+      "Reff": 1000000.0,
+      "MSLP_DGM": 0.01,
+      "CLDliq": 100.0,
+      "CTP": 0.01
+    },
+    "scales_comment": "Scaling factors for specific variables. If a variable is not listed here it will not be scaled. Needed for matrix regularisation. Precip-> mm/day, AOD -> x100, Reff -> microns, MSLP_DGM -> hPa, CLDliq -> percent, CTP -> hPa",
+    "override_loc": {
+      "Cess": 2.0
+    },
+    "override_loc_comment": "Override location values for specific variables.  Cess value is a climate sens of cira 2K.",
+    "config": "processing\\config_sim_cov.json",
+    "help_help": "show this help message and exit",
+    "files_help": "List of files to read in. Must glob to at least two files.",
+    "config_help": "Config file path whose values will overwrite default values but be overwritten by command line values",
+    "cov_file_help": "File to write covariance matrix to as a csv file",
+    "location_file_help": "File to write mean values to as a json file",
+    "metadata_file_help": "File to write metadata to as a json file",
+    "scalings_file_help": "JSON file where scalings to be written to",
+    "cov_time_help": "Time range to use for covariance matrix. If not provided all years will be used",
+    "location_time_help": "Time range to use for location values. If not provided same years as used for cov will be used",
+    "rename_help": "A json dictionary of variable names to rename. E.g. '{\"T2m\":\"T\"}'",
+    "variables_help": "Variables to use for covariance matrix. If not provided all common variables will be used. ",
+    "exclude_variables_help": "Variables to exclude from the calculations. If not provided no variables will be excluded.",
+    "regions_help": "List of regions to process. If not provided all regions will be used.",
+    "special_regions_help": "A json dictionary of variable names to list of regions to use for those variables. E.g. '{\"T2m\":[\"NHX_L\",\"T_L\"]}'",
+    "exclude_vars_files_help": "a json dict indexxed by variable with list of file *names* to exclude.",
+    "mslp_vars_help": "List of variables that are mean sea level pressure. These will be converted to delta from global mean values.",
+    "levels_help": "A json dictionary of variable names to levels to use for those variables. E.g. '{\"T\":500}'",
+    "override_cov_help": "A json dictionary of variable_regions to override/supplement the covariances values E.g. '{\"netflux_global\":1e-2}'. Off diagonal values will be zeroed",
+    "override_loc_help": "A json dictionary of variable_regions to override/supplement the location values E.g. '{\"Cess\":2.0}' ",
+    "covariance_estimator_help": "Covariance estimator to use",
+    "block_help": "Each variables is considered independent with only covariances within a variable calculated.",
+    "process_help": "Whether to process the data or not.",
+    "scales_help": "A json dictionary of variable names to scale the variables by. E.g. '{\"Precip\":86400}'",
+    "overwrite_help": "Overwrite existing files",
+    "log_level_help": "Log level of the script. ",
+    "print_default_help": "Print the default options and exit",
+    "print_variables_help": "Print the variables found."
+  }
+}

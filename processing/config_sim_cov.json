@@ -5,13 +5,13 @@
   "process_comment": "Data already been processed so don't reprocess",
   "cov_file": "$OPT_UKESM_ROOT/covariance/AMIP_intvar.csv",
   "cov_file_comment": "Path for covariance file. If null then use default value",
-  "location_file": "$OPT_UKESM_ROOT/configs/std_AMIP_2011.ijson",
+  "location_file": "$OPT_UKESM_ROOT/configs/std_AMIP_2005.ijson",
   "location_file_comment": "Path for location file. If null then use default value",
   "metadata_file": "$OPT_UKESM_ROOT/configs/AMIP_metadata.json",
   "metadata_file_comment": "Path for metadata file. ",
   "scalings_file": "$OPT_UKESM_ROOT/configs/scalings.ijson",
   "scalings_file_comment": "Path for scalings file. ",
-  "location_time": ["2011-01","2011-12"],
+  "location_time": ["2005-01","2005-12"],
   "standard_time_comment": "Start & end time as ISO std string or null for no start or end. ",
   "variables":
      ["OLR","RSR", "netflux","OLRC","RSRC","T2m", "Precip", "MSLP_DGM","T@500","RH@500","Reff","CLDliq","CTP","AOD_550" ],
@@ -59,6 +59,5 @@
     "CLDliq": 100.0,
     "CTP": 1e-2
   },
-  "scales_comment": "Scaling factors for specific variables. If a variable is not listed here it will not be scaled. Needed for matrix regularisation. Precip-> mm/day, AOD -> x100, Reff -> microns, MSLP_DGM -> hPa, CLDliq -> percent, CTP -> hPa",
-
+  "scales_comment": "Scaling factors for specific variables. If a variable is not listed here it will not be scaled. Needed for matrix regularisation. Precip-> mm/day, AOD -> x100, Reff -> microns, MSLP_DGM -> hPa, CLDliq -> percent, CTP -> hPa"
 }
