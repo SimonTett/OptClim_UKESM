@@ -2,7 +2,7 @@ numpy~=2.2 # keep numba/xarray.regrid happy
 metomi-rose~=2.2 # avoid most recent version.
 scikit-learn~=1.6
 f90nml
-xarray[complete]~=2025.7
+xarray[complete]~=2025.6 # most recent xarray version compatable with python 3.10
 scitools-iris
 xarray-regrid[accel]
 pandas
