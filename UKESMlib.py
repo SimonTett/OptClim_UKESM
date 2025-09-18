@@ -225,7 +225,7 @@ def is_lon_lat(da: xarray.DataArray):
 
 def conservative_regrid(source: typing.Union[xarray.Dataset,xarray.DataArray],
                         target: xarray.DataArray
-                        ) -> xarray.Dataset:
+                        ) -> typing.Union[xarray.Dataset,xarray.DataArray]:
     # TODO - make this only work for data-arrays and then use map for datasets.
     # Will return None if field is not long/lat.
     # And if field long.lat grid matches target -- just return it. No need for any more processing at that point.
@@ -245,7 +245,9 @@ def conservative_regrid(source: typing.Union[xarray.Dataset,xarray.DataArray],
 
 
     regridded = source.regrid.conservative(target)  # and regrid using xarray-regrid.
-
+    # update the attributes
+    regridded.attrs['regrid_method'] = 'conservative'
+    regridded.attrs.update(source.attrs)  # copy over attributes from source
     return regridded
 
 
@@ -306,8 +308,6 @@ def da_regional_avg(da:xarray.DataArray,masks: dict[str, xarray.DataArray]) -> x
         result.append(mn)
     result = xarray.concat(result, dim='region',coords='minimal')
     result.attrs = da.attrs
-    for c in [lon_name, lat_name]:
-        result.attrs[c+'_range'] = [float(da[c].min()), float(da[c].max())]
 
     return result
 
@@ -399,6 +399,8 @@ def process(ts:xarray.DataArray) -> xarray.DataArray:
         result = xarray.concat([result, ts_delta], dim=region_coord,join='outer').load()
     except TypeError: # catch nones coming back
         my_logger.warning(f'Problem computing seasonal means for {ts.name}')
+    # copy attributes across
+    result.attrs = ts.attrs
     return result
 
 def merge_cov(covariance: pd.DataFrame, covariance2: pd.DataFrame) -> pd.DataFrame:
@@ -464,6 +466,11 @@ def um_cubes(files:typing.Union[list[str],str],
                 print(f'{k} has {counts[k]} fields')
             return None
         if stash_codes is not None: # got some stash codes
+            # check stash codes are sensible
+            for sc in stash_codes:
+                if not re.match(r'm\d{2}s\d{2}i\d{3}',sc):
+                    raise ValueError(f'Stash code {sc} is not sensible')
+            my_logger.debug(f'Filtering on stash codes {stash_codes}')
             fields = [f for f in fields if  str(f.stash) in stash_codes] # filter on stash codes.
 
         if intervals is not None: # got some intervals

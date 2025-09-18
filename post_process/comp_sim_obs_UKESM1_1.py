@@ -35,6 +35,7 @@ import sys
 import warnings # so we can supress iris warnings...
 
 
+
 warnings.simplefilter(action='ignore', category=FutureWarning)
 warnings.filterwarnings('ignore', category=RuntimeWarning,
                         message='invalid value encountered in divide')
@@ -49,10 +50,10 @@ wanted_stash=[
                   'm01s01i207','m01s01i208','m01s01i209', # incoming & outgoing SW  and clear sky outgoing
                   'm01s02i205', 'm01s02i206', # Outgoing LW all and clear sky
                   'm01s02i464',
-                  'm01s02i285','m01s02i300','m01s02i301','m01s02i302','m01s02i303' # AOD diagnostics
+                  'm01s02i285','m01s02i300','m01s02i301','m01s02i302','m01s02i303', # AOD diagnostics
                   'm01s05i063',
                   'm01s50i063', # dry mass of air
-                  'm01s34i073','m01s34i102','m01s34i104','m01s34i108','m01s34i11','m01s34i114', # mmr's
+                  'm01s34i073','m01s34i102','m01s34i104','m01s34i108','m01s34i114', # H2SO4  mmr's for h2s04,sol nucleation, aitkin sol,,accum sol ,coarse sol H2SO4
                   'm01s34i072', # SO2 MMR
                   'm01s34i071', # DMS
                   'm01s16i222', # MSLP
@@ -377,6 +378,21 @@ def genProcess(dataset:xarray.Dataset,
             except KeyError:  # failed to find some co-ords
                 my_logger.warning(f"Failed to select {var} using {args} or {kwargs}")
                 return None
+        # TODO -- add attributes which include the longitude/latitude/time ranges in the data.
+        coords = UKESMlib.guess_coordinate_names(var)
+        attrs=dict()
+        for coord in coords:
+            if coord is not None and coord in var.coords:
+                cmin = var[coord].min()
+                cmax = var[coord].max()
+                try:
+                    cmin = float(cmin.values)
+                    cmax = float(cmax.values)
+                except TypeError: # failure probably because time. Convert to string
+                    cmin = str(var['time'].min().dt.strftime('%Y-%m-%d').values)
+                    cmax = str(var['time'].max().dt.strftime('%Y-%m-%d').values)
+                attrs.update({f'{coord}_range': [cmin, cmax]})
+        var.attrs.update(attrs) # add in the attrs
         return var
 
     def unweight(stash:str,name:str,scale=None,
@@ -403,10 +419,11 @@ def genProcess(dataset:xarray.Dataset,
         if (wt_value is None) or (wt is None):
             my_logger.warning(f"Failed to find wt_value or wt for {name} using stash {stash}")
             return None
-        result = wt_value.where(wt > close_to_zero) / wt  # compute the effective radius
-        result = result.rename(name)  # rename the result
-        if scale is not None:
-            result = result * scale
+        with xarray.set_options(keep_attrs=True):
+            result = wt_value.where(wt > close_to_zero) / wt  # compute the effective radius
+            result = result.rename(name)  # rename the result
+            if scale is not None:
+                result = result * scale
         return result
         
 
@@ -430,16 +447,19 @@ def genProcess(dataset:xarray.Dataset,
         # 2300+2301+2302+2303+2285
         result = 0.0 # initialise result
         missing = []
+
         for item in items:
-            stash = f'm01s02i{item:03d}'
-            da = name_fn(stash,name_type='stash',*args,**kwargs)
-            if da is None:  # if not found then skip
-                missing += [stash]  # add to missing list
-            else:
-                result += da.sel(pseudo_level=pseudolev_550nm)  # get the dataArray for the item and  add to result
+            with xarray.set_options(keep_attrs=True):
+                stash = f'm01s02i{item:03d}'
+                da = name_fn(stash,name_type='stash',*args,pseudo_level=pseudolev_550nm, **kwargs)
+                if da is None:  # if not found then skip
+                    missing += [stash]  # add to missing list
+                else:
+                    result += da  # add to result
         if len(missing) > 0:  # if any missing then return None
             my_logger.warning(f"Failed to find AOD components {missing}")
             return None
+        result.attrs['standard_name'] = 'atmosphere_optical_thickness_due_to_ambient_aerosol_particles' # put in full standard name
         result = result.rename('AOD')  # rename the result
         return result
 
@@ -548,6 +568,7 @@ def compute_values(files: list[pathlib.Path],
                    land_mask:xarray.DataArray,
                    time_range:typing.Optional[time_range_type] = None,
                    exclude_vars:typing.Optional[list[str]] = None,
+                   variables:typing.Optional[list[str]] = None,
                    land_mask_fraction:float = 0.5) -> dict[str,xarray.DataArray]:
     """
 
@@ -579,6 +600,12 @@ def compute_values(files: list[pathlib.Path],
 
     masks = UKESMlib.create_region_masks(land_mask,critical_value=land_mask_fraction)
     process = genProcess(dataset,exclude_vars=exclude_vars)
+    if variables is not None and len(variables) > 0:
+        # only keep the variables we want
+        for name in list(process.keys()):
+            if name not in variables:
+                process[name]=None
+                my_logger.debug(f'Not processing {name} as not in variables list')
 
     # now to process all the data making output.
     results=dict()
@@ -600,6 +627,7 @@ def compute_values(files: list[pathlib.Path],
         result = UKESMlib.process(mean).compute()
         results[name] = result
         my_logger.info(f'Processed {name}')
+
     
     
     
@@ -655,6 +683,7 @@ def do_work():
                           land_mask_fraction=0.5,
                           file_pattern = '*a.pm*.pp',
                           exclude_vars=[],
+                          variables=None,
                           timeseries=False,
                           overwrite=True
                           
@@ -671,6 +700,7 @@ def do_work():
     parser.add_argument('--land_mask_fraction',help='Critical value for land',type=float)
     parser.add_argument('--file_pattern',help='File glob pattern to read data from')
     parser.add_argument('--exclude_vars',help='Things not to process',nargs='+')
+    parser.add_argument('--variables',help='Variables to process',nargs='+')
     parser.add_argument('--timeseries',help='Have timeseries output',action=argparse.BooleanOptionalAction)
     parser.add_argument('--overwrite',help='Overwrite',action=argparse.BooleanOptionalAction)
     parser.add_argument('--print-defaults',help='Print out defaults, actual values  and then exit',action='store_true')
@@ -741,12 +771,14 @@ def do_work():
     results = compute_values(files, land_mask,
                              time_range=time_range,
                              land_mask_fraction=land_mask_fraction,
-                             exclude_vars=exclude_vars)
+                             exclude_vars=exclude_vars,
+                             variables = options.get('variables'))
 
 
     if not timeseries: # time average unless we are a timeseries.
-        for k in results.keys():
-            results[k]=results[k].mean('time')
+        with xarray.set_options(keep_attrs=True):
+            for k in results.keys():
+                results[k]=results[k].mean('time')
 
     # write the data out
     if output_file.suffix == '.json': # json file
