@@ -33,7 +33,7 @@ import logging
 import UKESMlib
 import sys
 import warnings # so we can supress iris warnings...
-
+import shutil
 
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
@@ -677,17 +677,18 @@ def do_work():
     """
                                      )
     defaults = dict(dir='data',
-                          output_file='observations.json',
-                          log_level = 'WARNING',
-                          mask_variable='field36',
-                          land_mask_fraction=0.5,
-                          file_pattern = '*a.pm*.pp',
-                          exclude_vars=[],
-                          variables=None,
-                          timeseries=False,
-                          overwrite=True
+                    output_file='observations.json',
+                    log_level = 'WARNING',
+                    mask_variable='field36',
+                    land_mask_fraction=0.5,
+                    file_pattern = '*a.pm*.pp',
+                    exclude_vars=[],
+                    variables=None,
+                    timeseries=False,
+                    overwrite=True,
+                    clean=False
                           
-                          )
+                    )
     parser.add_argument("CONFIG", help="The Name of the Config file",type=pathlib.Path)
     parser.add_argument("-d", "--dir",
                         help="The Name of the input directory",type=pathlib.Path)
@@ -703,6 +704,7 @@ def do_work():
     parser.add_argument('--variables',help='Variables to process',nargs='+')
     parser.add_argument('--timeseries',help='Have timeseries output',action=argparse.BooleanOptionalAction)
     parser.add_argument('--overwrite',help='Overwrite',action=argparse.BooleanOptionalAction)
+    parser.add_argument('--clean',help='Remove input directory',action=argparse.BooleanOptionalAction)
     parser.add_argument('--print-defaults',help='Print out defaults, actual values  and then exit',action='store_true')
     args = parser.parse_args()  # and parse the arguments
 
@@ -710,6 +712,9 @@ def do_work():
     # setup processing
     with args.CONFIG.open('rt') as fp:
         json_options = json.load(fp)  # load the options from the config file
+        if 'postProcess' in json_options:
+            json_options=json_options['postProcess'] # extract the postProcess part
+            my_logger.debug('Extracted post-proccc block')
 
     options=defaults.copy()
     options.update({k:v for k,v in json_options.items() if (v is not None and not k.endswith('_comment'))})
@@ -790,14 +795,18 @@ def do_work():
                 {f'{variable}_{k}':float(v) for k,v in series.items()}
             )
         
+
         with output_file.open('wt') as fp:
             json.dump(r2, fp, indent=2)
     elif output_file.suffix == '.nc': # just write it out for netcdf.
         xarray.Dataset(results).to_netcdf(output_file,unlimited_dims=['time'])
     else:
         raise ValueError(f'Do not know what to do with {output_file}')
-    
 
+
+    if options['clean']:
+        shutil.rmtree(rootdir,ignore_errors=True)
+        my_logger.info(f"Removed {rootdir}")
 
 if __name__ == "__main__":
     do_work()
