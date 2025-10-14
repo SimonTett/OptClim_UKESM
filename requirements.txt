@@ -10,4 +10,5 @@ matplotlib
 cftime
 scipy
 dotenv # makes it easy to set up environment variables
+#PyQt5 # needed on archer2?
 
