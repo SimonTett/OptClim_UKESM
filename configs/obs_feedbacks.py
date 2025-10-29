@@ -35,13 +35,13 @@ def comp_obs_feedback(run_submit_instance,
         return None
     # now we can compute the feedbacks
     d_flux = obs['plus4K'].loc['netflux_global'] - obs['control'].loc['netflux_global']
-    d_temp =  obs['plus4K'].loc['T_global'] - obs['control'].loc['T_global'] # should be close to 4K. Slightly different as land may warm more than ocean.
+    d_temp =  obs['plus4K'].loc['T2m_global'] - obs['control'].loc['T2m_global'] # should be close to 4K. Slightly different as land may warm more than ocean.
     cess = -d_flux/d_temp # Cess feedback in W/m2/K
     my_logger.debug(f'Computed CESS = {cess} W/m2/K for dFlux={d_flux} W/m2 and dtemp={d_temp} K')
-    result = obs['control'].append(pd.Series({'Cess':cess}))
+    result = pd.concat([obs['control'],pd.Series({'Cess':cess})])
     # and then add on the plus4K data so have that.
-    rename = {k:'plus4K-' for k in obs['plus4K'].index}
-    plus4k = obs['plus4K'].rename(rename)
-    result = result.append(plus4k)
+    rename = {k:f'plus4K-{k}' for k in obs['plus4K'].index}
+    plus4k = obs['plus4K'].rename(index=rename)
+    result = pd.concat([result,plus4k])
     return result
 
