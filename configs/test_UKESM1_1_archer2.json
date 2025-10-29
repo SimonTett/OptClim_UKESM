@@ -183,7 +183,7 @@
     "covariance": {
       "comment": "Covariance matrices and operations on them. If CovObsErr and CovIntVar are *both* specified then CovTotal will be computed from them. TODO MOVE coviariance info somewhere else..",
       "CovTotal": null,
-      "CovTotal_Comment": "Name of file containing Covariance Matrix for total Error. FIXME when have final internal var ",
+      "CovTotal_Comment": "Name of file containing Covariance Matrix for total Error. ",
       "CovTotalDiagonalise": false,
       "CovTotalDiagonalise_comment": "If true diagonalise the total covariance matrix",
       "CovIntVar": "$OPT_UKESM_ROOT/covariance/AMIP_intvar.csv",
