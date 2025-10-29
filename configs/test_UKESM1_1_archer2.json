@@ -111,8 +111,8 @@
 	"ai"
     ],
     "run_info": {
-	"runTime": 1800,
-	"runTime_comment": "Time in seconds for run. ",
+	"runTime": 3600,
+	"runTime_comment": "Time in seconds for post processing ",
 	"runCode": "n02-TERRAFIRMA",
 	"runCode_comment": "Project code to run job with.",
 	"submit_engine": null,
@@ -135,12 +135,20 @@
 	    "--qos=serial"
 	],
 	"runExtraArgs_comment": "List of extra args for submission. For archer2 need to specify qos for pp job and resubmission",
-	"prebuild": false,
-	"prebuild_comment": "If True guess from ref model. If string use as path to prebuild. Path should be on puma2. Models in this study already use prebuild",
-	"use_scratch": true,
-	"use_scratch_comment": "use scratch space on Archer2. Means models get cleaned up after 28 days.",
+	"prebuild": null,
+	"prebuild_comment": " If string use as path to prebuild. Path should be on puma2. Models in this study already use prebuild",
 	"OPTCLIM_ARGS":" -v -v ",
-	"OPTCLIM_ARGS_comment":"Extra args to be passed to scripts called.  Shoudl give debug info"
+	"OPTCLIM_ARGS_comment":"Extra args to be passed to scripts called.  Shoudl give debug info",
+	"runEnvSetup":"$OPTCLIMTOP/OptClimVn3/setup_archer2",
+	"runEnvSetup_comment":"setup to source to setup environment",
+	"transfer_dir":"/gws/nopw/j04/terrafirma/tetts/optclim/",
+	"transfer_dir_comment":"Where to transfer data to on jasmin, See UM_rose for details",
+	"local_root_dir":"/mnt/lustre/a2fs-work2/work/n02/shared/tetts",
+	"local_root_dir_comment":"Used to generate remote_directory names",
+	"remote_machine":"puma2",
+	"remote_machine_comment":"remote machine to install model dir on",
+	"remote_model_dir":"optclim_runs",
+	"remote_model_dir_comment":"Remote directory to install model dir in"
     },
   "run_info_comment": "Information  for run_info. Must include submit_engine and modelName. Can include other keys for use in submission. Useful ones are runTime, runCode & maxRuns ",
   "logging": "INCLUDE $OPT_UKESM_ROOT/configs/log_config.ijson",
