@@ -153,7 +153,7 @@
   "parameters_comment": "List of parameter sets to run. Each entry is a dictionary of parameter names and values and will be augmented with fixed_params. null values will use standard parameter values. Each dict *must* have the same keys.",
   "sigma":true,
   "sigma_comment":"Set true so that Cess works",
-  "mu": 0.4,
+  "mu": 0.5,
   "mu_comment": "The inverse weighting given to the constraint -- it gets wt 1/(2mu). If Null then no constraint should be applied",
   "fixme":"This constraint is not needed for run_params but hacked in so that Cess can be seen...",
 
