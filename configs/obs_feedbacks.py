@@ -1,8 +1,8 @@
 # Function to be run that computes observations and climate sensitivities
 
-import UKESMlib
 import pandas as pd
 import typing
+import logging
 type_basic = int|float|str|bool
 def comp_obs_feedback(run_submit_instance,
                       parameter_dict:dict[str,dict[str,type_basic]]) -> typing.Optional[pd.Series]:
@@ -20,7 +20,7 @@ def comp_obs_feedback(run_submit_instance,
     :return: a pandas series with the observations, Cess sensitivity & plus4K "obs" (with plus4K- appended to names).
     """
 
-    my_logger = UKESMlib.my_logger
+    my_logger = logging.getLogger('UKESM')
     models = dict()
     obs = dict()
     # get models and simulated obs. This case has no dependencies between models so is straightforward.
