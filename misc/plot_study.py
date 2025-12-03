@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # plot the progres of the study to date
 
 
@@ -114,7 +115,7 @@ ax.set_yscale('asinh')
 ax.yaxis.set_major_formatter(sf)
 ax.yaxis.get_offset_text().set_visible(False)
 fig.show()
-fig.savefig(args.output,bbox_inches='tight')
+
 
 
 
