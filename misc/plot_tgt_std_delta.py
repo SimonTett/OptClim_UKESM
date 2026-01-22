@@ -11,6 +11,7 @@ import typing
 import pathlib
 figures_dir = pathlib.Path(figures_dir)
 figures_dir.mkdir(parents=True, exist_ok=True)
+
 def comp_x_y(n:int,max_delta:typing.Optional[int]=None) -> tuple[int,int]:
     """Compute a good layout for n subplots."""
     if n <= 1:
