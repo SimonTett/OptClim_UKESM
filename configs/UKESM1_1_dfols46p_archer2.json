@@ -202,8 +202,6 @@
       "mu_comment": "The inverse weighting given to the constraint -- it gets wt 1/(2mu). If Null then no constraint should be applied",
       "dfols": {
 	  "dfols_comment": "Settings for DFOLS",
-	  "growing.ndirs_initial": null,
-	  "growing.ndirs_initial_comment": "the number of perturbations on first iteration. If not specified then will make Nparm perturbtions",
 	  "rhobeg": 0.18,
 	  "rhobeg_comment": "Radius of parameter trust region at start",
 	  "rhoend": 0.1,
@@ -214,15 +212,19 @@
 	  "scaling_within_bounds_comment": "Scale internally so all in range 0 to 1",
 	  "raise_error":null,
 	  "raise_error_comment":"If True then allow optimise function to raise error rather than DFOLS. Default is false",
-	  "EvaluationDataBase": {
-        "parameters": "$OPT_UKESM_ROOT/previous_runs/dfols26_to_46p_UKESM1_1_params.csv",
-        "parameters_comment": "Path to csv file of previous parameter values. Header should be param names, col 0 names",
-        "simulated_observations": "$OPT_UKESM_ROOT/previous_runs/dfols26_to_46p_UKESM1_1_simobs.csv",
-        "simulated_observations_comment": "Path to csv file of previous simulated obs. Header should be obs names, col 0 names",
-        "start_index": "minimum",
-        "start_index_comment": "If specified then index of first row to use from csv files. If null then use initParams. If minimum use minimum value from database."
-      },
-        "EvaluationDataBase_comment": "If specified then DFOLS will use previous model runs stored in csv files to avoid rerunning model where possible",
+	  "do_logging":true,
+	  "do_logging_comment":"If true then dfols does logging, Need logging on to work",
+	  "evaluation_database": {
+	      "parameters": "$OPT_UKESM_ROOT/eval_db/params26_26p.csv",
+              "parameters_comment": "Path to csv file of previous parameter values. Header should be param names, col 0 names",
+	      "simulated_observations": "$OPT_UKESM_ROOT/eval_db/obs26p.csv",
+	      "simulated_observations_comment": "Path to csv file of previous simulated obs. Header should be obs names, col 0 names",
+
+	      "start_index": "I36_i0",
+	      "start_index_comment": "If specified then index of first row to use from csv files. If null then use initParams. If minimum use minimum value from database.",
+	      "_comment": "Generated using /work/n02/shared/tetts/ModelOptimisation/OptClimVn3/scripts/update_params.py at 2026-01-22 16:23:56.534173 with cmd line args /work/n02/shared/tetts/ModelOptimisation/OptClimVn3/scripts/update_params.py ../opt_dfols26/dfols26p.scfg --study_config_path configs/UKESM1_1_dfols46p_archer2.json --output_obs eval_db/obs26p.csv --output_params eval_db/params26_26p.csv --eval_db_path evaluation_db.json --log INFO"
+	  },
+        "evaluation_database_comment": "If specified then DFOLS will use previous model runs stored in csv files to avoid rerunning model where possible",
         "namedSettings": "INCLUDE $OPT_UKESM_ROOT/configs/dfols_named_params.ijson",
 	  "namedSetting_comment":"Named setting for DFOLS. See file for details + dfols doc"
       }

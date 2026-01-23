@@ -39,7 +39,9 @@
     "restarts.max_npt_comment": "Maximum number of points/model evals in each restart",
     "tr_radius.gamma_dec": 0.8,
     "tr_radius.alpha1": 0.9,
-    "tr_radius.alpha2": 0.95
+    "tr_radius.alpha2": 0.95,
+    "growing.ndirs_initial": null,
+    "growing.ndirs_initial_comment": "the number of perturbations on first iteration. If not specified then will make Nparm perturbtions"
 }
 
 
