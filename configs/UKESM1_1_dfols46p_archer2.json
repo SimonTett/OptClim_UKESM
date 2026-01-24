@@ -120,7 +120,8 @@
 	"maxRuns": 10,
 	"maxRuns_comment": "Maximum number of runs to do in parallel. Jobs submitted is 2x this + 1.",
 	"max_model_simulations": 30,
-	"max_model_simulations_comment": "The maximum number of model sims to be done. Not really used at present.", "runQueue": "serial",
+	"max_model_simulations_comment": "The maximum number of model sims to be done. Not really used at present.",
+    "runQueue": "serial",
 	"runQueue_comment": "Q to run all optclim jobs in",
 	"runExtraArgs": [
 	    "--qos=serial"
@@ -216,7 +217,7 @@
 	  "do_logging_comment":"If true then dfols does logging, Need logging on to work",
 	  "evaluation_database": {
 	      "parameters": "$OPT_UKESM_ROOT/eval_db/params26_26p.csv",
-              "parameters_comment": "Path to csv file of previous parameter values. Header should be param names, col 0 names",
+          "parameters_comment": "Path to csv file of previous parameter values. Header should be param names, col 0 names",
 	      "simulated_observations": "$OPT_UKESM_ROOT/eval_db/obs26p.csv",
 	      "simulated_observations_comment": "Path to csv file of previous simulated obs. Header should be obs names, col 0 names",
 
@@ -224,8 +225,8 @@
 	      "start_index_comment": "If specified then index of first row to use from csv files. If null then use initParams. If minimum use minimum value from database.",
 	      "_comment": "Generated using /work/n02/shared/tetts/ModelOptimisation/OptClimVn3/scripts/update_params.py at 2026-01-22 16:23:56.534173 with cmd line args /work/n02/shared/tetts/ModelOptimisation/OptClimVn3/scripts/update_params.py ../opt_dfols26/dfols26p.scfg --study_config_path configs/UKESM1_1_dfols46p_archer2.json --output_obs eval_db/obs26p.csv --output_params eval_db/params26_26p.csv --eval_db_path evaluation_db.json --log INFO"
 	  },
-        "evaluation_database_comment": "If specified then DFOLS will use previous model runs stored in csv files to avoid rerunning model where possible",
-        "namedSettings": "INCLUDE $OPT_UKESM_ROOT/configs/dfols_named_params.ijson",
+      "evaluation_database_comment": "If specified then DFOLS will use previous model runs stored in csv files to avoid rerunning model where possible",
+      "namedSettings": "INCLUDE $OPT_UKESM_ROOT/configs/dfols_named_params.ijson",
 	  "namedSetting_comment":"Named setting for DFOLS. See file for details + dfols doc"
       }
   },
@@ -249,9 +250,9 @@
     "time_range":["2011-01","2011-12"],
     "time_range_comment": "Start & end time as ISO std string or null for no start or end. ",
     "file_pattern": "*a.pz*.pp",
-      "file_pattern_comment": "File pattern to match for post-processing. Normal glob rules ",
-      "clean":true,
-      "clean_comment":"If true remove dir (and all files in it) after processing data"
+    "file_pattern_comment": "File pattern to match for post-processing. Normal glob rules ",
+    "clean":true,
+    "clean_comment":"If true remove dir (and all files in it) after processing data"
   },
   "targets": "INCLUDE $OPT_UKESM_ROOT/configs/target_2011.ijson",
   "scalings": "INCLUDE $OPT_UKESM_ROOT/configs/scalings.ijson",
