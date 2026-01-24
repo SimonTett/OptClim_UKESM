@@ -8,6 +8,8 @@ import matplotlib.pyplot as plt
 import  typing
 import math
 import pandas as pd
+import tempfile
+from archive_study import archive_study
 
 
 
@@ -28,11 +30,12 @@ def comp_x_y(n:int,max_delta:typing.Optional[int]=None) -> tuple[int,int]:
     return x,y
 
 
-
+arc_path = pathlib.Path('results/archive_dfols26p.tar.gz')
+if "cfg" not in globals():
+    d = tempfile.TemporaryDirectory()
+    arc,cfg = archive_study.extract_archive(arc_path,pathlib.Path(d.name))
 
 start_idx = 'I0_i0' # initial params
-cfg_path = list(pathlib.Path(r"C:\Users\geosfeld\OneDrive - University of Edinburgh\Documents\dfols26p").glob('*.scfg'))[0]
-cfg = SubmitStudy.SubmitStudy.load_SubmitStudy(cfg_path)
 best_idx = cfg.logical_cost().idxmin()
 
 sim_obs = cfg.logical_obs(scale=True)
