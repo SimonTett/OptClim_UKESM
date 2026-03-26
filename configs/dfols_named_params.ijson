@@ -12,6 +12,8 @@
     "logging.save_diagnostic_info_comment": "Save logging info",
     "logging.save_xk": true,
     "logging.save_xk_comment": "Save the full vector of trial values ",
+    "logging.n_to_print_whole_x_vector":100,
+    "logging.n_to_print_whole_x_vector_comment":"No fo values in xk to print",
     "noise.quit_on_noise_level": true,
     "noise.quit_on_noise_level_comment": "quit/restart if all trial evaluations are within noise level of last iteration",
     "general.check_objfun_for_overflow": false,

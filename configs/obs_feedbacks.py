@@ -3,9 +3,14 @@
 import pandas as pd
 import typing
 import logging
+import genericLib
 type_basic = int|float|str|bool
+
+my_logger = logging.getLogger('UKESM')
+#my_logger = genericLib.setup_logging(level='DEBUG',rootname='UKESM')
+
 def comp_obs_feedback(run_submit_instance,
-                      parameter_dict:dict[str,dict[str,type_basic]]) -> typing.Optional[pd.Series]:
+                      parameter_dict:dict[str,dict[str,type_basic]]) -> tuple[list['Model.Model'],[typing.Optional[pd.Series]]]:
     """
     Function to compute obs and feedbacks for a given run/submit instance and parameter dictionary.
     Is example of a function that can be used to run multiple models. No need to raise errors on None.
@@ -17,10 +22,9 @@ def comp_obs_feedback(run_submit_instance,
         'netflux_global' and 'T_global'. global mean net TOA flux and global mean surface temperature.
     :param run_submit_instance: a runSubmit instance
     :param parameter_dict: dictionary of parameters to set for the model.
-    :return: a pandas series with the observations, Cess sensitivity & plus4K "obs" (with plus4K- appended to names).
+    :return: list of models & a pandas series with the observations, Cess sensitivity & plus4K "obs" (with plus4K- appended to names). 
     """
 
-    my_logger = logging.getLogger('UKESM')
     models = dict()
     obs = dict()
     # get models and simulated obs. This case has no dependencies between models so is straightforward.
@@ -28,11 +32,12 @@ def comp_obs_feedback(run_submit_instance,
     # in that case would need to run models in expected order checking that they exist before running dependent models.
     # more complex cases could be handled by modifying parameters in models based on results from other models.
     for name,param_dict in parameter_dict.items():
-        models[name] = run_submit_instance.make_model(param_dict) # this will create a new model or return an existing one.
+        models[name] = run_submit_instance.make_model(param_dict,reference_name=name) # this will create a new model or return an existing one.
+        my_logger.debug(f" config name: {name} model name {models[name].name} reference: {models[name].reference}")
         obs[name]:typing.Optional[pd.Series] = models[name].simulated_obs # get the simulated obs for this model. If None model not been run yet.
     # test that all models ran and produced obs. Any that are None will mean can't compute result.
     if any([o is None for o in obs.values()]):
-        return None
+        return list(models.values()),None
     # now we can compute the feedbacks
     d_flux = obs['plus4K'].loc['netflux_global'] - obs['control'].loc['netflux_global']
     d_temp =  obs['plus4K'].loc['T2m_global'] - obs['control'].loc['T2m_global'] # should be close to 4K. Slightly different as land may warm more than ocean.
@@ -43,5 +48,5 @@ def comp_obs_feedback(run_submit_instance,
     rename = {k:f'plus4K-{k}' for k in obs['plus4K'].index}
     plus4k = obs['plus4K'].rename(index=rename)
     result = pd.concat([result,plus4k])
-    return result
+    return list(models.values()),result
 
