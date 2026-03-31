@@ -1,0 +1,16 @@
+{
+  "evaluation_database": {
+    "parameters": "$OPT_UKESM_ROOT/eval_db/params_combined_46p.csv",
+    "simulated_observations": "$OPT_UKESM_ROOT/eval_db/obs_combined_46p.csv",
+    "start_index": "26p_I0_i0",
+    "_comment": "Generated using OptClim_UKESM/misc/merge_for_database.py at 2026-03-31 20:03:00.253976 merging 26p and 44p cases",
+    "obs_files_comment": [
+      "$OPT_UKESM_ROOT/eval_db/obs26p.csv",
+      "$OPT_UKESM_ROOT/eval_db/obs46p.csv"
+    ],
+    "param_files_comment": [
+      "$OPT_UKESM_ROOT/eval_db/params26_26p.csv",
+      "$OPT_UKESM_ROOT/eval_db/params46_46p.csv"
+    ]
+  }
+}
