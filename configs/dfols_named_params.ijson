@@ -33,7 +33,7 @@
     "restarts.increase_npt": false,
     "restarts.increase_npt_comment": "Increase number of points when restarting",
     "restarts.increase_npt_amt_comment": "Number of points to increase by in restarts.increase_npt set when restarting",
-    "restarts.max_unsuccessful_restarts": 100,
+    "restarts.max_unsuccessful_restarts": 5,
     "restarts.max_unsuccessful_restarts_comment": "Number of consecutive restarts allowed when no progress made",
     "restarts.hard.increase_ndirs_initial_amt": 1,
     "restarts.hard.increase_ndirs_initial_amt_comment": "How many points to increase by  when doing hard restart (not using any exisiting pts)",

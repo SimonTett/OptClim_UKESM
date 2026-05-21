@@ -12,6 +12,7 @@ import numpy as np
 
 cfg_path = pathlib.Path("results/dfols26p/UKESM1_1_dfols26p_archer2_final.json")
 cfg_path = pathlib.Path("opt_dfols46/UKESM1_1_dfols46p_archer2_final.json")
+cfg_path = pathlib.Path("opt_dfols46_try2/UKESM1_1_dfols46p_archer2_try2_final.json")
 #cfg_path = pathlib.Path("opt_dfols26/UKESM1_1_dfols26p_archer2_final.json")
 cfg = StudyConfig.readConfig(cfg_path)
 soln = cfg.dfols_solution()
