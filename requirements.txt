@@ -12,5 +12,6 @@ cftime
 scipy
 dotenv # makes it easy to set up environment variables
 seaborn
+filelock # for locking files when running multiple instances of the same code, e.g. when running multiple instances of the same code on a cluster, or when running multiple instances of the same code on a local machine.
 
 

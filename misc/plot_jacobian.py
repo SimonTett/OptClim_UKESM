@@ -9,22 +9,24 @@ import seaborn as sns
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.colors import AsinhNorm
 
 cfg_path = pathlib.Path("results/dfols26p/UKESM1_1_dfols26p_archer2_final.json")
 cfg_path = pathlib.Path("opt_dfols46/UKESM1_1_dfols46p_archer2_final.json")
 cfg_path = pathlib.Path("opt_dfols46_try2/UKESM1_1_dfols46p_archer2_try2_final.json")
 #cfg_path = pathlib.Path("opt_dfols26/UKESM1_1_dfols26p_archer2_final.json")
+cfg_path = pathlib.Path("results/dfols46p_try2/UKESM1_1_dfols46p_archer2_try2_final.json")
 cfg = StudyConfig.readConfig(cfg_path)
 soln = cfg.dfols_solution()
 ranges = cfg.paramRanges().loc['rangeParam',:]
-jac_trans = cfg.transJacobian()*ranges
+jac_trans = cfg.transJacobian()
 err = cfg.Covariances(scale=True)['CovTotal']
 std_err = pd.Series(np.sqrt(np.diag(err)),index=err.index)
 
 transform = cfg.transMatrix(scale=True,dataFrame=True)
 jac = jac_trans.T@transform # undo the transform
-
-jac = jac.div(std_err,axis=1)
+jac = jac.mul(ranges,axis=0) # scale by the ranges.
+jac = jac.div(std_err,axis=1) # how many std errors does a  unit normalised param change do.
 fig,axs = plt.subplots(nrows=1,ncols=1,num='jacobian',layout='constrained',clear=True,figsize=[12,8])
-sns.heatmap(np.abs(jac),cmap='YlOrRd',ax=axs,vmin=2,vmax=500)
+sns.heatmap(jac.T,cmap='Spectral',ax=axs,norm=AsinhNorm(vmin=-500,vmax=500))
 fig.show()

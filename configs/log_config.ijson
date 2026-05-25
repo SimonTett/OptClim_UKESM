@@ -1,26 +1,47 @@
 {
 	"_comment":"configuration for logging. See https://docs.python.org/3.9/library/logging.config.html#logging-config-dictschema. Use INCLUDE pathname to include in a config. dfols logging goes to a file",
-	"history_comment":"This version generated August 2023 by SFBT and modified Sept 2025 & march 2026",
-	    "version": 1,
-	    "formatters": {
-		"std": {
-		    "format": "%(levelname)s:%(name)s:%(funcName)s: %(message)s",
-		    "validate": true
-		},
-		"brief": {
-		    "format": "%(levelname)s:%(name)s:  %(message)s",
-		    "validate": true
-		}
-	    },
-	    "formatters_comment":"Control formatting output",
-	    "handlers": {
+	"history_comment":"This version generated August 2023 by SFBT and modified subsequently -- see git log for details",
+    "version": 1,
+    "disable_existing_loggers": true,
+    "disable_existing_loggers_comment":"Whether or not to disable existing loggers. If true then only loggers specified in this config will be active. If false then loggers specified in this config will be added to existing loggers. Set to false to avoid losing log output from other libraries.",
+    "mkdir": true,
+    "mkdir_comment":"If true create any directories needed for filename.",
+    "formatters": {
+    "std": {
+        "format": "%(levelname)s:%(name)s:%(funcName)s: %(message)s",
+        "validate": true
+    },
+    "brief": {
+        "format": "%(levelname)s:%(name)s:  %(message)s",
+        "validate": true
+    }
+    },
+    "formatters_comment":"Control formatting output",
+
+    "filters": {
+        "dedupe_console": {
+          "()": "genericLib.DuplicateFilter",
+          "max_duplicates": 5000,
+          "level": "DEBUG"
+        },
+        "dedupe_file": {
+          "()": "genericLib.DuplicateFilter",
+          "max_duplicates": 1000,
+          "level": "WARNING"
+        }
+        },
+    "filters_comment":"Control filters. Currently filters to deduplicate debug (and above) for console and warnings (and above) for file.",
+
+    "handlers": {
 		"console": {
 		    "class": "logging.StreamHandler",
-		    "formatter": "std"
+		    "formatter": "std",
+		     "filters": ["dedupe_console"]
 		},
 		"consoleBrief": {
 		    "class": "logging.StreamHandler",
-		    "formatter": "brief"
+		    "formatter": "brief",
+		     "filters": ["dedupe_console"]
 		},
 		"fileDFOLS":{
 		    "class":"logging.FileHandler",
@@ -31,7 +52,8 @@
 		    "class": "logging.FileHandler",
 		    "filename": "${OPTCLIM_LOG_DIR}/warnings_${OPTCLIM_JOB_ID}.log",
 		    "level": "WARNING",
-		    "formatter": "std"
+		    "formatter": "std",
+		    "filters": ["dedupe_file"]
 		}	
 		
 	    },
@@ -44,6 +66,7 @@
 		},
 		"OPTCLIM.generic_json": {
 		    "level": "WARNING",
+		    "propagate": false,
 		    "handlers":["consoleBrief","fileWarning"]
 		},
 		"UKESM": {
@@ -57,10 +80,5 @@
 		    "handlers":["fileDFOLS","fileWarning"]
 		}
 	    },
-    "loggers_comment":"Provides three   loggers. , INFO for UKESM, INFO for all of OPTCLIM. WARNING for generic_json. Below is config for dfols which when used provides duplicate log output..",
-    "logger_dfols_comment": {
-		    "level": "DEBUG",
-		    "propogate": false,
-		    "handlers": ["console"]
-		}
+    "loggers_comment":"Provides four   loggers.  INFO for UKESM, INFO for all of OPTCLIM. WARNING for generic_json & debug for dfols. "
 	}
