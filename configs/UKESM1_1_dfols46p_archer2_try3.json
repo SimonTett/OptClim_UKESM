@@ -3,9 +3,9 @@
   "Developer_comment": "StudyConfig.py provides methods that work with this configuration file. Remember to change them if you change structure of this.",
   "version": 4,
   "version_comment": "Version ID",
-  "Name": "dfols46p_2",
+  "Name": "dfols46p_3",
   "Name_comment": "Study Name",
-  "baseRunID": "dz",
+  "baseRunID": "dx",
   "baseRunID_comment": "base for runID",
   "paramNames_comment": {
     "comment": "Description of params.",
@@ -149,7 +149,7 @@
   "optimiseFunction_comment": "Name of optimisation function to run. null gives default",
   "runUpgrade_vn4": "For vn4 add list of things to do here!",
   "initial": {
-    "initParams": "INCLUDE $OPT_UKESM_ROOT/configs/start_params_UKESM1_1.ijson",
+    "initParams": "INCLUDE $OPT_UKESM_ROOT/configs/start_params_UKESM1_1_try3.ijson",
     "initScale": false,
     "initScale_comment": "If true then startParams range from 0 to 1 where 0 means min value; 1 max value.",
     "fixedParams": {
@@ -227,36 +227,39 @@
     "mu": 0.01,
     "mu_comment": "The inverse weighting given to the constraint -- it gets wt 1/(2mu). If Null then no constraint should be applied",
     "dfols": {
-      "dfols_comment": "Settings for DFOLS",
-      "rhobeg": 0.18,
-      "rhobeg_comment": "Radius of parameter trust region at start",
-      "rhoend": 0.1,
-      "rhoend_comment": "Radius of parameter trust region for termination (for our purpose this is in normalised parameters)",
-      "maxfun": 10,
-      "maxfun_comment": "Maximum number of fn evaluations to be done.  Can generate multiple model sims",
-      "scaling_within_bounds": true,
-      "scaling_within_bounds_comment": "Scale internally so all in range 0 to 1",
-      "raise_error": null,
-      "raise_error_comment": "If True then allow optimise function to raise error rather than DFOLS. Default is false",
-      "do_logging": true,
-      "do_logging_comment": "If true then dfols does logging, Need logging on to work",
-      "evaluation_database": {
-        "parameters": "$OPT_UKESM_ROOT/eval_db/params_combined_46p.csv",
-        "simulated_observations": "$OPT_UKESM_ROOT/eval_db/obs_combined_46p.csv",
-        "start_index": "26p_I0_i0",
-        "_comment": "Generated using OptClim_UKESM/misc/merge_for_database.py at 2026-03-31 20:03:00.253976 merging 26p and 44p cases",
-        "obs_files_comment": [
-          "$OPT_UKESM_ROOT/eval_db/obs26p.csv",
-          "$OPT_UKESM_ROOT/eval_db/obs46p.csv"
-        ],
-        "param_files_comment": [
-          "$OPT_UKESM_ROOT/eval_db/params26_26p.csv",
-          "$OPT_UKESM_ROOT/eval_db/params46_46p.csv"
-        ]
-      },
-      "evaluation_database_comment": "If specified then DFOLS will use previous model runs stored in csv files to avoid rerunning model where possible",
-      "namedSettings": "INCLUDE $OPT_UKESM_ROOT/configs/dfols_named_params.ijson",
-      "namedSetting_comment": "Named setting for DFOLS. See file for details + dfols doc"
+	"dfols_comment": "Settings for DFOLS",
+	"rhobeg": 0.18,
+	"rhobeg_comment": "Radius of parameter trust region at start",
+	"rhoend": 0.1,
+	"rhoend_comment": "Radius of parameter trust region for termination (for our purpose this is in normalised parameters)",
+	"maxfun": 10,
+	"maxfun_comment": "Maximum number of fn evaluations to be done.  Can generate multiple model sims",
+	"scaling_within_bounds": true,
+	"scaling_within_bounds_comment": "Scale internally so all in range 0 to 1",
+	"raise_error": null,
+	"raise_error_comment": "If True then allow optimise function to raise error rather than DFOLS. Default is false",
+	"do_logging": true,
+	"do_logging_comment": "If true then dfols does logging, Need logging on to work",
+	"evaluation_database": {
+	    "parameters": "$OPT_UKESM_ROOT/eval_db/params_combined_46p_try3.csv",
+	    "simulated_observations": "$OPT_UKESM_ROOT/eval_db/obs_combined_46p_try3.csv",
+	    "start_index": null,
+	    "start_index_comment": "If null use the start values. Other choices are minimum -- pick min cost fn or specify a start-index value",
+	    "_comment": "Generated using misc/merge_for_database.py at 2026-05-25 16:31:41.628979 merging 26p, 46p & 46p_try2cases",
+	    "obs_files_comment": [
+		"$OPT_UKESM_ROOT/eval_db/obs26p.csv",
+		"$OPT_UKESM_ROOT/eval_db/obs46p.csv",
+		"$OPT_UKESM_ROOT/eval_db/obs46p_try2.csv"
+	    ],
+	    "param_files_comment": [
+		"$OPT_UKESM_ROOT/eval_db/params26_26p.csv",
+		"$OPT_UKESM_ROOT/eval_db/params46_46p.csv",
+		"$OPT_UKESM_ROOT/eval_db/params46p_try2.csv"
+	    ]
+	},
+	"evaluation_database_comment": "If specified then DFOLS will use previous model runs stored in csv files to avoid rerunning model where possible",
+	"namedSettings": "INCLUDE $OPT_UKESM_ROOT/configs/dfols_named_params.ijson",
+	"namedSetting_comment": "Named setting for DFOLS. See file for details + dfols doc"
     }
   },
   "postProcess": {
