@@ -1,0 +1,18 @@
+{
+  "evaluation_database": {
+    "parameters": "$OPT_UKESM_ROOT/eval_db/params_combined_46p_try3.csv",
+    "simulated_observations": "$OPT_UKESM_ROOT/eval_db/obs_combined_46p_try3.csv",
+    "start_index": "min",
+    "_comment": "Generated using misc/merge_for_database.py at 2026-05-25 16:31:41.628979 merging 26p, 46p & 46p_try2cases",
+    "obs_files_comment": [
+      "$OPT_UKESM_ROOT/eval_db/obs26p.csv",
+      "$OPT_UKESM_ROOT/eval_db/obs46p.csv",
+      "$OPT_UKESM_ROOT/eval_db/obs46p_try2.csv"
+    ],
+    "param_files_comment": [
+      "$OPT_UKESM_ROOT/eval_db/params26_26p.csv",
+      "$OPT_UKESM_ROOT/eval_db/params46_46p.csv",
+      "$OPT_UKESM_ROOT/eval_db/params46p_try2.csv"
+    ]
+  }
+}

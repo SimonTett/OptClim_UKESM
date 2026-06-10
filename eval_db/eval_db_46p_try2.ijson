@@ -1,0 +1,8 @@
+{
+  "evaluation_database": {
+    "parameters": "OptClim_UKESM/eval_db/params46p_try2.csv",
+    "simulated_observations": "OptClim_UKESM/eval_db/obs46p_try2.csv",
+    "start_index": "I0_i49",
+    "_comment": "Generated using /mnt/lustre/a2fs-work2/work/n02/shared/tetts/ModelOptimisation/OptClimVn3/scripts/update_params.py at 2026-05-25 09:51:14.350897 with cmd line args /mnt/lustre/a2fs-work2/work/n02/shared/tetts/ModelOptimisation/OptClimVn3/scripts/update_params.py opt_dfols46_try2/dfols46p_2.scfg --output_obs OptClim_UKESM/eval_db/obs46p_try2.csv --output_params OptClim_UKESM/eval_db/params46p_try2.csv --eval_db_path OptClim_UKESM/eval_db/eval_db_46p_try2.ijson --log DEBUG"
+  }
+}
