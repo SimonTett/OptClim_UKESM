@@ -28,13 +28,14 @@ def ceil_preferred(x: float, preferred=(1, 2, 5)) -> float:
     k = next((v for v in vals if m <= v), vals[0] * 10)
     return k * scale
 
-cfg_path = pathlib.Path("results/dfols26p/UKESM1_1_dfols26p_archer2_final.json")
+#cfg_path = pathlib.Path("results/dfols26p/UKESM1_1_dfols26p_archer2_final.json")
 cfg_path = pathlib.Path("opt_dfols46/UKESM1_1_dfols46p_archer2_final.json")
-cfg_path = pathlib.Path("opt_dfols46_try2/UKESM1_1_dfols46p_archer2_try2_final.json")
+#cfg_path = pathlib.Path("opt_dfols46_try2/UKESM1_1_dfols46p_archer2_try2_final.json")
 #cfg_path = pathlib.Path("opt_dfols26/UKESM1_1_dfols26p_archer2_final.json")
-cfg_path = pathlib.Path("results/dfols46p_try2/UKESM1_1_dfols46p_archer2_try2_final.json")
-cfg_path = pathlib.Path("dfols46p_3/UKESM1_1_dfols46p_archer2_try3_final.json")
-cfg_path = pathlib.Path("/work/n02/n02/egavilan/calibration/dfol_nemo_12p/NEMO36_dfols12p_archer2_final.json")
+#cfg_path = pathlib.Path("results/dfols46p_try2/UKESM1_1_dfols46p_archer2_try2_final.json")
+#cfg_path = pathlib.Path("dfols46p_3/UKESM1_1_dfols46p_archer2_try3_final.json")
+cfg_path = pathlib.Path("dfols46p_4/UKESM1_1_dfols46p_archer2_try4_final.json")
+#cfg_path = pathlib.Path("/work/n02/n02/egavilan/calibration/dfol_nemo_12p/NEMO36_dfols12p_archer2_final.json")
 cfg = StudyConfig.readConfig(cfg_path)
 soln = cfg.dfols_solution()
 ranges = cfg.paramRanges().loc['rangeParam',:]
@@ -49,6 +50,7 @@ jac = jac.div(std_err,axis=0) # how many std errors does a  unit normalised para
 vmax = ceil_preferred(float(np.abs(jac).max(axis=None,numeric_only=True)))
 fig,axs = plt.subplots(nrows=1,ncols=1,num='jacobian',layout='constrained',clear=True,figsize=[12,8])
 
-sns.heatmap(jac,cmap='Spectral',ax=axs,norm=AsinhNorm(vmin=-vmax,vmax=vmax))
+mask = np.abs(jac.T) < 1 # not really sig changes.
+sns.heatmap(jac.T,mask=mask,cmap='Spectral',ax=axs,norm=AsinhNorm(vmin=-vmax,vmax=vmax))
 axs.tick_params(axis='x', labelrotation=45) 
 fig.show()
